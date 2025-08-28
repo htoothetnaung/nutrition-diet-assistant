@@ -17,6 +17,7 @@ import os
 import sys
 from dotenv import load_dotenv
 import asyncio
+import json
 
 # Load .env and set env defaults BEFORE importing any RAG modules
 load_dotenv()
@@ -179,8 +180,8 @@ with st.sidebar:
             st.rerun()
         
         st.divider()
-        st.subheader("⚙️ Settings")
-        st.info("User preferences and settings will be available here in future updates.")
+        # st.subheader("⚙️ Settings")
+        # st.info("User preferences and settings will be available here in future updates.")
 
 # Main app content
 if st.session_state.authenticated:
@@ -206,12 +207,22 @@ if st.session_state.authenticated:
 
         with col1:
             st.subheader("💬 Chat Sessions")
+            # Mode selector (bind directly to session_state to persist across reruns)
+            if 'chat_mode' not in st.session_state:
+                st.session_state.chat_mode = "RAG Q&A"
+            st.radio(
+                "Mode",
+                options=["RAG Q&A", "User Coach"],
+                horizontal=True,
+                key="chat_mode",
+            )
 
             # New chat button
             if st.button("+ New Chat", type="primary", use_container_width=True):
                 if st.session_state.user_data:
                     new_session_id = chat_manager.create_new_chat_session(
-                        st.session_state.user_data['id']
+                        st.session_state.user_data['id'],
+                        category=st.session_state.chat_mode
                     )
                     if new_session_id:
                         st.session_state.current_session_id = new_session_id
@@ -237,19 +248,23 @@ if st.session_state.authenticated:
                     #     st.info(f"Loaded {len(st.session_state.chat_sessions)} messages")
                     # else:
                     #     st.info(f"No chat sessions found for user: {current_user_id}")
-                    st.info("Loaded messages")
+                    # st.info("Loaded messages")
             # Display chat sessions
             if st.session_state.chat_sessions:
                 st.write("**Recent Chats:**")
                 for session in st.session_state.chat_sessions:
                     session_id = session['id']
                     title = session['title']
+                    category = session.get('category') or "RAG Q&A"
                     is_current = session_id == st.session_state.current_session_id
 
                     # Session button with styling
                     button_type = "primary" if is_current else "secondary"
+                    label = f"{'🟢 ' if is_current else '💬 '}{title[:25]}" + ("..." if len(title) > 25 else "")
+                    # Append a small mode badge
+                    badge = " [Coach]" if category == "User Coach" else " [RAG]"
                     if st.button(
-                        f"{'🟢 ' if is_current else '💬 '}{title[:25]}" + ("..." if len(title) > 25 else ""),
+                        label + badge,
                         key=f"session_{session_id}",
                         type=button_type,
                         use_container_width=True
@@ -356,7 +371,7 @@ if st.session_state.authenticated:
                     except Exception:
                         collection_count = "unknown"
                     db_path = getattr(vs, "_persist_directory", None) or cfg['data_ingestion']['vector_store']['persist_directory']
-                    st.info(f"Vector store ready. Docs: {collection_count} • DB: {os.path.abspath(db_path)}")
+                    # st.info(f"Vector store ready. Docs: {collection_count} • DB: {os.path.abspath(db_path)}")
                     # Store LLM for generic fallback answers when no context is retrieved
                     st.session_state.llm = llm
                     st.session_state.rag_initialized = True
@@ -385,12 +400,12 @@ if st.session_state.authenticated:
                 )
                 
                 # Debug: Show chat history info
-                if current_messages:
+                # if current_messages:
                     # st.info(f"Loaded {len(current_messages)} messages for session: {st.session_state.current_session_id}")
                     # st.info(f"Loaded {len(current_messages)} messages")
-                    st.info("Loaded messages")
-                else:
-                    st.info(f"No messages found for session: {st.session_state.current_session_id}")
+                    # st.info("Loaded messages")
+                # else:
+                #     st.info(f"No messages found in this session")
                 for idx, message in enumerate(current_messages):
                     with st.chat_message("user"):
                         st.markdown(f"""
@@ -416,7 +431,35 @@ if st.session_state.authenticated:
                             try:
                                 if st.session_state.qa_chain is None:
                                     raise RuntimeError("RAG is not initialized. Check your GOOGLE_API_KEY and vector store.")
-                                result = st.session_state.qa_chain.invoke({"query": prompt})
+                                # Determine session mode (category)
+                                current_mode = "RAG Q&A"
+                                for s in (st.session_state.chat_sessions or []):
+                                    if s.get('id') == st.session_state.current_session_id:
+                                        current_mode = s.get('category') or "RAG Q&A"
+                                        break
+
+                                final_query = prompt
+                                if current_mode == "User Coach":
+                                    # Fetch user preferences
+                                    prefs = db_manager.get_user_preferences(st.session_state.user_data['id']) or {}
+                                    if not prefs:
+                                        assistant_response = (
+                                            "I need your saved profile to personalize advice. Go to Nutrition Plan, fill the form, and click 'Save Data'."
+                                        )
+                                        raise Exception("no_user_prefs")
+                                    # Compose a concise user profile JSON with macros if available
+                                    try:
+                                        prefs_json = json.dumps(prefs, ensure_ascii=False)
+                                    except Exception:
+                                        prefs_json = str(prefs)
+                                    coach_preamble = (
+                                        "You are a personal nutrition coach for this user. Use the USER PROFILE JSON below together with retrieved documents. "
+                                        "Prioritize user's constraints (allergies, preferences, goals). Be concise and actionable.\n"
+                                        f"USER PROFILE: {prefs_json}\n"
+                                    )
+                                    final_query = coach_preamble + f"Question: {prompt}"
+
+                                result = st.session_state.qa_chain.invoke({"query": final_query})
                                 # Default response from RAG
                                 assistant_response = result.get("result") if isinstance(result, dict) else str(result)
 
@@ -431,10 +474,17 @@ if st.session_state.authenticated:
                                         if llm is None:
                                             raise RuntimeError("LLM not available for fallback.")
                                         # Enforce concise fallback: one short, direct sentence
-                                        brief_prompt = (
-                                            "Answer in ONE short, direct sentence (<=20 words). "
-                                            f"Question: {prompt}"
-                                        )
+                                        if current_mode == "User Coach":
+                                            brief_prompt = (
+                                                "Answer in ONE short sentence tailored to the USER PROFILE. "
+                                                f"USER PROFILE: {prefs_json if 'prefs_json' in locals() else '{}'}\n"
+                                                f"Question: {prompt}"
+                                            )
+                                        else:
+                                            brief_prompt = (
+                                                "Answer in ONE short, direct sentence (<=20 words). "
+                                                f"Question: {prompt}"
+                                            )
                                         generic = llm.invoke(brief_prompt)
                                         if hasattr(generic, "content") and generic.content:
                                             assistant_response = generic.content
@@ -451,7 +501,10 @@ if st.session_state.authenticated:
                                 if not isinstance(assistant_response, str):
                                     assistant_response = str(assistant_response)
                             except Exception as e:
-                                assistant_response = f"RAG error: {e}"
+                                if str(e) == "no_user_prefs":
+                                    pass  # assistant_response already set
+                                else:
+                                    assistant_response = f"RAG error: {e}"
 
                             chat_manager.add_message_to_chat(
                                 st.session_state.current_session_id,

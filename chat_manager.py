@@ -13,10 +13,13 @@ class ChatManager:
         else:
             self.engine = None
     
-    def create_new_chat_session(self, user_id: str, title: str = "New Chat", category: Optional[str] = None) -> Optional[str]:
+    def create_new_chat_session(self, user_id: str, title: Optional[str] = None, category: Optional[str] = None) -> Optional[str]:
         """Create a new chat session for a user"""
         session_id = str(uuid.uuid4())
         now = datetime.now()
+        # Auto-generate a timestamped title if not provided
+        if not title or not title.strip():
+            title = now.strftime("Chat %Y-%m-%d %H:%M")
 
         if not self.engine:
             if "chat_sessions_all" not in st.session_state:
@@ -24,7 +27,7 @@ class ChatManager:
 
             st.session_state.chat_sessions_all[session_id] = {
                 "user_id": user_id,
-                "title": "Untitled",
+                "title": title,
                 "category": None,
                 "created_at": now,
                 "updated_at": now,
