@@ -21,7 +21,7 @@ import json
 
 # Load .env and set env defaults BEFORE importing any RAG modules
 load_dotenv()
-os.environ.setdefault("USER_AGENT", "NutriBench/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
+os.environ.setdefault("USER_AGENT", "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
 # Strongly disable Chroma telemetry at process start
 os.environ.setdefault("CHROMA_TELEMETRY_DISABLED", "1")
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
@@ -58,7 +58,7 @@ except Exception:
 
 # Page configuration
 st.set_page_config(
-    page_title="NutriBench", 
+    page_title="Nutrion", 
     layout="wide",
     page_icon="🥗"
 )
@@ -189,7 +189,7 @@ if st.session_state.authenticated:
     st.markdown(
         """
         <div style="text-align: center;">
-            <h3>🥗 <b>NutriBench: Smart Nutrition and Diet Assistant</b> 🥗</h3>
+            <h3>🥗 <b>Nutrion: Smart Nutrition and Diet Assistant</b> 🥗</h3>
             <p style="font-size: 15px; color: #666;">Your personal nutrition companion powered by AI</p>
         </div>
         """, 
@@ -333,7 +333,7 @@ if st.session_state.authenticated:
             # --- Header ---
             st.markdown("""
                 <div style='text-align:center'>
-                    <h4><b>NutriBench AI Chat Assistant</b></h4>
+                    <h4><b>Nutrion AI Chat Assistant</b></h4>
                     <p style="color:gray;">Ask anything about nutrition, meals, or health goals</p>
                     <br>
                 </div>
@@ -679,7 +679,7 @@ if st.session_state.authenticated:
 
     # Tab 3: Meal Analyzer (moved from tab2)
     with tab3:
-        st.header("🍽 Meal Analyzer")
+        st.header("Meal Analyzer")
         st.markdown("Analyze your meals for nutrition content and get personalized recommendations")
         
         # col1, col2 = st.columns([2, 1])
@@ -1105,7 +1105,7 @@ else:
     st.markdown(
         """
         <div style="text-align: center; padding: 50px;">
-            <h2>🥗 <b>Welcome to NutriBench</b> 🥗</h2>
+            <h2>🥗 <b>Welcome to Nutrion</b> 🥗</h2>
             <h4>Smart Nutrition and Diet Assistant</h4>
             <p style="font-size: 15px; color: #666; margin: 30px 0;">
                 Your personal AI-powered nutrition companion for healthier eating habits
