@@ -33,9 +33,14 @@ langchain-community==0.3.27
 langchain-google-genai==2.1.9
 langchain-text-splitters==0.3.9
 langsmith==0.4.5
-chromadb==0.5.3
 pypdf==4.2.0
 beautifulsoup4==4.12.3
-langchain-chroma
+# Removed chromadb as we're using Supabase
+# Use langchain-community for Supabase integration instead of specific package
 
 mistralai
+
+# Crawling & content extraction for KB (web -> Markdown)
+requests==2.32.3
+trafilatura==1.6.3
+python-frontmatter==1.0.1

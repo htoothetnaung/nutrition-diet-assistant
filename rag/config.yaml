@@ -1,21 +1,27 @@
-app_name: "Gemini RAG for NutriBench"
+app_name: "Gemini RAG for Nutrion"
 
 gemini:
   llm_model: "models/gemini-1.5-flash"
   embedding_model: "models/embedding-001"
 
 data_ingestion:
-  document_sources: 
-     - type: "pdf"
-       path: "./data/pdfs/"
+  document_sources:
+    - type: "pdf"
+      path: "./data/pdfs/"
+    - type: "markdown"
+      path: "./data/web/"
   chunking:
     chunk_size: 1000
     chunk_overlap: 200
   vector_store:
-    type: "chromadb"
-    persist_directory: "./rag/chroma_db"
-    collection_name: "nutribench_rag"
+    # type: "chromadb"
+    # persist_directory: "./rag/chroma_db"
+    # collection_name: "nutribench_rag"
+
+    type: "supabase"
+    supabase_url: ""
+    supabase_key: ""
 
 rag:
-  retrieval_k: 5
+  retrieval_k: 15
   chain_type: "stuff"

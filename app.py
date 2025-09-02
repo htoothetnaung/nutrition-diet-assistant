@@ -22,13 +22,9 @@ import json
 # Load .env and set env defaults BEFORE importing any RAG modules
 load_dotenv()
 os.environ.setdefault("USER_AGENT", "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
-# Strongly disable Chroma telemetry at process start
-os.environ.setdefault("CHROMA_TELEMETRY_DISABLED", "1")
-os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
-os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "noop")
 
 # Import Mistral-based planner AFTER env is loaded
-from test import get_plan_json
+from meal import get_plan_json
 
 # Make local RAG package importable
 RAG_SRC = os.path.join(os.path.dirname(__file__), "rag", "src")
@@ -50,7 +46,7 @@ try:
     from config_loader import load_config
     from embedding_model import get_gemini_embeddings
     from llm_model import get_gemini_llm
-    from vector_store import get_chroma_vector_store
+    from vector_store import get_vector_store
     from rag_chain import build_rag_chain
 except Exception:
     # Defer import errors to UI when initializing RAG
@@ -352,12 +348,18 @@ if st.session_state.authenticated:
                     cfg_path = os.path.join(os.path.dirname(__file__), 'rag', 'config.yaml')
                     cfg = load_config(cfg_path)
                     emb = get_gemini_embeddings(model_name=cfg['gemini']['embedding_model'])
-                    vs = get_chroma_vector_store(
-                        persist_directory=cfg['data_ingestion']['vector_store']['persist_directory'],
-                        collection_name=cfg['data_ingestion']['vector_store']['collection_name'],
+                    vs_cfg = cfg['data_ingestion']['vector_store']
+                    vs = get_vector_store(
+                        config=vs_cfg,
                         embedding_function=emb,
                     )
-                    retriever = vs.as_retriever(search_kwargs={"k": cfg['rag']['retrieval_k']})
+                    # Add similarity score threshold to filter out low-quality matches
+                    retriever = vs.as_retriever(
+                        search_kwargs={
+                            "k": cfg['rag']['retrieval_k'],
+                            "score_threshold": 0.7  # Only use documents with at least 70% similarity
+                        }
+                    )
                     llm = get_gemini_llm(model_name=cfg['gemini']['llm_model'])
                     st.session_state.qa_chain = build_rag_chain(
                         llm=llm,
@@ -365,13 +367,11 @@ if st.session_state.authenticated:
                         chain_type=cfg['rag']['chain_type'],
                         return_source_documents=True,
                     )
-                    # Diagnostics: show collection stats and DB location
+                    # Diagnostics: show collection stats
                     try:
-                        collection_count = vs._collection.count()
+                        collection_count = "available"
                     except Exception:
                         collection_count = "unknown"
-                    db_path = getattr(vs, "_persist_directory", None) or cfg['data_ingestion']['vector_store']['persist_directory']
-                    # st.info(f"Vector store ready. Docs: {collection_count} • DB: {os.path.abspath(db_path)}")
                     # Store LLM for generic fallback answers when no context is retrieved
                     st.session_state.llm = llm
                     st.session_state.rag_initialized = True
@@ -382,7 +382,7 @@ if st.session_state.authenticated:
                 st.error(f"RAG initialization failed: {st.session_state.rag_error}")
                 with st.expander("Details / Fix"):
                     st.write("- Ensure GOOGLE_API_KEY is set in your .env or environment")
-                    st.write("- Ensure ingestion has run to populate the Chroma store")
+                    st.write("- Ensure ingestion has run to populate the Supabase store")
                 if st.button("↻ Retry RAG init", type="primary"):
                     st.session_state.rag_error = None
                     st.session_state.rag_initialized = False
@@ -438,7 +438,7 @@ if st.session_state.authenticated:
                                         current_mode = s.get('category') or "RAG Q&A"
                                         break
 
-                                final_query = prompt
+                                original_query = prompt
                                 if current_mode == "User Coach":
                                     # Fetch user preferences
                                     prefs = db_manager.get_user_preferences(st.session_state.user_data['id']) or {}
@@ -452,14 +452,23 @@ if st.session_state.authenticated:
                                         prefs_json = json.dumps(prefs, ensure_ascii=False)
                                     except Exception:
                                         prefs_json = str(prefs)
+                                    
+                                    # First retrieve documents using the original query
+                                    retrieval_docs = st.session_state.qa_chain.retriever.get_relevant_documents(original_query)
+                                    
+                                    # Then create the coach-specific prompt with user profile
                                     coach_preamble = (
                                         "You are a personal nutrition coach for this user. Use the USER PROFILE JSON below together with retrieved documents. "
                                         "Prioritize user's constraints (allergies, preferences, goals). Be concise and actionable.\n"
                                         f"USER PROFILE: {prefs_json}\n"
                                     )
-                                    final_query = coach_preamble + f"Question: {prompt}"
-
-                                result = st.session_state.qa_chain.invoke({"query": final_query})
+                                    coach_query = coach_preamble + f"Question: {original_query}"
+                                    
+                                    # Use the chain with retrieved documents and coach query
+                                    result = st.session_state.qa_chain._call({"query": coach_query, "input_documents": retrieval_docs})
+                                else:
+                                    # Standard RAG mode - use the chain normally
+                                    result = st.session_state.qa_chain.invoke({"query": original_query})
                                 # Default response from RAG
                                 assistant_response = result.get("result") if isinstance(result, dict) else str(result)
 
@@ -677,7 +686,7 @@ if st.session_state.authenticated:
                 except Exception as e:
                     st.error(f"Plan generation failed: {e}. Ensure MISTRAL_API_KEY is set in your environment.")
 
-    # Tab 3: Meal Analyzer (moved from tab2)
+     # Tab 3: Meal Analyzer (moved from tab2)
     with tab3:
         st.header("Meal Analyzer")
         st.markdown("Analyze your meals for nutrition content and get personalized recommendations")
@@ -708,7 +717,7 @@ if st.session_state.authenticated:
         
         # Analysis buttons and results
         btn_col1, btn_col2 = st.columns([1,1])
-        analyze_text = btn_col1.button("🔍 Analyze Text", type="primary")
+        analyze_text = btn_col1.button("🔍 Analyze Meal", type="primary")
         analyze_image = btn_col2.button("🖼️ Analyze Image (coming soon)", disabled=True)
 
         if analyze_text:
@@ -1139,6 +1148,6 @@ else:
     
     st.markdown("---")
     st.markdown(
-        "<div style='text-align: center; color: #888;'>Powered by AI • Built with ❤️ for better health</div>",
+        "<div style='text-align: center; color: #888;'>Powered by AI</div>",
         unsafe_allow_html=True
     )

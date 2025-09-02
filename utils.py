@@ -332,10 +332,12 @@ def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
                 schema_hint = (
                     "Return ONLY JSON with this exact shape: "
                     "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
-                    "items should include only edible foods actually mentioned. "
-                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice. "
-                    "If the unit is a volume/portion (cup/bowl/piece/slice) keep it as provided; do NOT convert to grams. "
-                    "Infer a reasonable quantity when obvious (e.g., '2 eggs' => quantity=2, unit='piece'). "
+                    "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
+                    "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
+                    "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
+                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
+                    "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
+                    "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
                     "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
                 )
                 prompt = (
@@ -359,10 +361,12 @@ def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
                 schema_hint = (
                     "Return ONLY JSON with this exact shape: "
                     "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
-                    "items should include only edible foods actually mentioned. "
-                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice. "
-                    "If the unit is a volume/portion (cup/bowl/piece/slice) keep it as provided; do NOT convert to grams. "
-                    "Infer a reasonable quantity when obvious (e.g., '2 eggs' => quantity=2, unit='piece'). "
+                    "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
+                    "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
+                    "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
+                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
+                    "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
+                    "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
                     "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
                 )
                 prompt = (
@@ -508,19 +512,33 @@ def _rough_local_lookup(item: Dict[str, Any]) -> Optional[Dict[str, float]]:
 def compute_nutrition(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0, "sugar_g": 0.0, "sodium_mg": 0.0}
     details = []
-    if not FDC_API_KEY:
-        return {"totals": totals, "details": details, "notes": "fdc_unavailable"}
+    
     for it in items:
-        food = _fdc_search(it.get("name", ""))
-        if not food:
-            continue
-        per100 = _extract_per100g(food)
-        grams = convert_to_grams(it.get("quantity", 100), it.get("unit", "g"), it.get("name", ""))
-        factor = grams / 100.0
-        nutrients = {k: round(v * factor, 2) for k, v in per100.items()}
-        fdc_id = food.get("fdcId")
-        for k in totals:
-            totals[k] += nutrients.get(k, 0.0)
-        details.append({"item": it, "nutrients": nutrients, "fdcId": fdc_id})
+        # First try USDA FDC API if available
+        nutrients = None
+        fdc_id = None
+        
+        if FDC_API_KEY:
+            food = _fdc_search(it.get("name", ""))
+            if food:
+                per100 = _extract_per100g(food)
+                grams = convert_to_grams(it.get("quantity", 100), it.get("unit", "g"), it.get("name", ""))
+                factor = grams / 100.0
+                nutrients = {k: round(v * factor, 2) for k, v in per100.items()}
+                fdc_id = food.get("fdcId")
+        
+        # If USDA lookup failed, try local lookup
+        if not nutrients:
+            local_nutrients = _rough_local_lookup(it)
+            if local_nutrients:
+                nutrients = local_nutrients
+                fdc_id = "local"
+        
+        # If we have nutrients, add to totals
+        if nutrients:
+            for k in totals:
+                totals[k] += nutrients.get(k, 0.0)
+            details.append({"item": it, "nutrients": nutrients, "fdcId": fdc_id})
+    
     totals = {k: round(v, 2) for k, v in totals.items()}
     return {"totals": totals, "details": details}

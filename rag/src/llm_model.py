@@ -11,7 +11,9 @@ def get_gemini_llm(model_name: str = "models/gemini-1.5-flash", api_key: Optiona
     llm = ChatGoogleGenerativeAI(
         model=model_name,
         google_api_key=key,
-        max_output_tokens=200,
-        temperature=0.3,
+        max_output_tokens=500,  # Increased to allow more detailed responses
+        temperature=0.1,  # Reduced further for more factual responses
+        top_p=0.95,
+        top_k=40,
     )
     return llm

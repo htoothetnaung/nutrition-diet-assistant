@@ -1,18 +1,33 @@
 import os
-from langchain_chroma import Chroma
-from chromadb.config import Settings
+from langchain_community.vectorstores import SupabaseVectorStore
+from supabase import create_client
 
-def get_chroma_vector_store(persist_directory: str, collection_name: str, embedding_function):
-    # Normalize persist directory to absolute path (relative to project root)
-    if not os.path.isabs(persist_directory):
-        # Project root = two levels up from this file (rag/src -> project)
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        persist_directory = os.path.abspath(os.path.join(project_root, persist_directory))
-    os.makedirs(persist_directory, exist_ok=True)
-    client_settings = Settings(anonymized_telemetry=False)
-    return Chroma(
-        persist_directory=persist_directory,
-        collection_name=collection_name,
-        embedding_function=embedding_function,
-        client_settings=client_settings,
-    )
+def get_vector_store(config, embedding_function):
+    """
+    Get a vector store based on the configuration.
+    
+    Args:
+        config: Configuration dictionary containing vector store settings
+        embedding_function: Embedding function to use for the vector store
+    
+    Returns:
+        A vector store instance
+    """
+    vector_store_type = config.get("type", "").lower()
+    
+    if vector_store_type == "supabase":
+        supabase_url = config.get("supabase_url")
+        supabase_key = config.get("supabase_key")
+        table_name = config.get("table_name", "embeddings")
+        
+        # Create Supabase client
+        supabase_client = create_client(supabase_url, supabase_key)
+        
+        # Return Supabase vector store
+        return SupabaseVectorStore(
+            client=supabase_client,
+            embedding=embedding_function,
+            table_name=table_name,
+        )
+    else:
+        raise ValueError(f"Unsupported vector store type: {vector_store_type}")

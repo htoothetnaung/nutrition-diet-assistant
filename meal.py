@@ -11,7 +11,7 @@ client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
 SCHEMA = '{"calories": int, "protein_g": int, "carbs_g": int, "fats_g": int, "meals": {"breakfast": str, "lunch": str, "snack": str, "dinner": str}, "notes": str}'
 
 INSTRUCTION = (
-    "You are a nutrition assistant. Given the user’s profile, recommend a daily macro breakdown and food suggestions. "
+    "You are a nutrition assistant. Given the user's profile, recommend a daily macro breakdown and food suggestions. "
     "Respect allergies, current goals, and dietary preferences (e.g., halal). Keep outputs consistent and realistic. "
     f"Return ONLY minified JSON (no markdown, no commentary) with this schema: {SCHEMA}. "
     "All numbers should be whole integers. Ensure calories ≈ 4*protein_g + 4*carbs_g + 9*fats_g (±10%)."
@@ -106,7 +106,7 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
             return None
     return None
 
-def get_plan_json(fields: dict, model: str = "mistral-small-latest") -> Dict[str, Any]:
+def get_plan_json(fields: dict, model: str = "ft:ministral-3b-latest:df8cc3b5:20250821:100048bc") -> Dict[str, Any]:
     user_input = serialize_input(fields)
     # Add extra constraints that the model should follow
     constrained_instruction = INSTRUCTION + " Ensure halal compliance when requested and strictly avoid listed allergens. If fat loss is the goal, set calories below maintenance."
@@ -119,7 +119,7 @@ def get_plan_json(fields: dict, model: str = "mistral-small-latest") -> Dict[str
     parsed = _extract_json(content)
     return parsed if parsed is not None else {"raw": content}
 
-def batch_score_csv(input_csv: str, output_csv: str, model: str = "mistral-small-latest") -> None:
+def batch_score_csv(input_csv: str, output_csv: str, model: str = "ft:ministral-3b-latest:df8cc3b5:20250821:100048bc") -> None:
     """Read user rows from CSV and write a CSV with a plan_json column for QA."""
     import pandas as pd
     df = pd.read_csv(input_csv)
