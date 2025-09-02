@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from auth import AuthManager
 from database import DatabaseManager
 from chat_manager import ChatManager
@@ -185,7 +186,7 @@ if st.session_state.authenticated:
     st.markdown(
         """
         <div style="text-align: center;">
-            <h3>🥗 <b>Nutrion: Smart Nutrition and Diet Assistant</b> 🥗</h3>
+            <h3>🍚 <b>Nutrion: Smart Nutrition and Diet Assistant</b> 🥗</h3>
             <p style="font-size: 15px; color: #666;">Your personal nutrition companion powered by AI</p>
         </div>
         """, 
@@ -194,8 +195,10 @@ if st.session_state.authenticated:
     st.markdown("---")
     
     # Create tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🧠 Ask Anything", "Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard", "📝 Export Report", "🎙️ Talk to Me"])
+    # tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard", "📝 Export Report", "🎙️ Talk to Me"])
     
+    tab1, tab2, tab3, tab4 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard"])
+
     # Tab 1: Ask Anything (ChatGPT-like Interface)
     with tab1:
         # Create two columns for chat sessions and chat interface
@@ -527,7 +530,7 @@ if st.session_state.authenticated:
 
     # Tab 2: AI Nutrition Plan (moved here)
     with tab2:
-        st.header("🧠 AI Nutrition Plan")
+        st.header("⚖️ AI Nutrition Plan")
         st.markdown("Fill in your details to generate a personalized daily nutrition plan.")
 
         # Section: Personal Info
@@ -626,7 +629,7 @@ if st.session_state.authenticated:
                     prefs["Plan_Macros"] = macros
                 ok = db_manager.save_user_preferences(st.session_state.user_data['id'], prefs)
                 if ok:
-                    st.success("Preferences saved.")
+                    st.success("Data saved.")
                 else:
                     st.error("Failed to save preferences.")
 
@@ -815,36 +818,189 @@ if st.session_state.authenticated:
                 st.info("Image-based nutrition analysis will be available in a future update.")
 
         # Removed inline AI Nutrition Plan; now in separate tab
+
+        # Show today's logged meal analyses for this user
+        st.divider()
+        st.subheader("📒 Today's Logged Meals")
+        if st.session_state.user_data:
+            _uid = st.session_state.user_data['id']
+            # Load user timezone from preferences; default to UTC
+            _prefs = db_manager.get_user_preferences(_uid) if _uid else {}
+            _tzname = (_prefs.get("timezone") or "UTC") if isinstance(_prefs, dict) else "UTC"
+            local_today = datetime.now(ZoneInfo(_tzname)).date()
+            logs = db_manager.get_user_meal_logs(_uid, limit=100) or []
+            rows = []
+            entries = []  # keep ids for per-row controls
+            totals_today = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0, "sugar_g": 0.0}
+            for m in logs:
+                try:
+                    mt = m.get("meal_time")
+                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.now(ZoneInfo("UTC"))
+                    dt_local = dt_utc.astimezone(ZoneInfo(_tzname))
+                    if dt_local.date() != local_today:
+                        continue
+                except Exception:
+                    continue
+                ana = db_manager.get_nutrition_analysis_by_meal(m.get("id")) or {}
+                cal = float(ana.get("calories", 0) or 0)
+                pr = float(ana.get("protein_g", 0) or 0)
+                cb = float(ana.get("carbs_g", 0) or 0)
+                ft = float(ana.get("fat_g", 0) or 0)
+                fib = float(ana.get("fiber_g", 0) or 0)
+                sug = float(ana.get("sugar_g", 0) or 0)
+                row = {
+                    "Time": dt_local.strftime("%H:%M"),
+                    "Description": m.get("meal_description", "-"),
+                    "Calories (kcal)": round(cal, 1),
+                    "Protein (g)": round(pr, 1),
+                    "Carbs (g)": round(cb, 1),
+                    "Fat (g)": round(ft, 1),
+                    "Fiber (g)": round(fib, 1),
+                    "Sugar (g)": round(sug, 1),
+                }
+                rows.append(row)
+                entries.append({
+                    "id": m.get("id"),
+                    **row,
+                })
+                totals_today["calories"] += cal
+                totals_today["protein_g"] += pr
+                totals_today["carbs_g"] += cb
+                totals_today["fat_g"] += ft
+                totals_today["fiber_g"] += fib
+                totals_today["sugar_g"] += sug
+
+            if rows:
+                with st.expander("Maintenance", expanded=False):
+                    if st.button("Clear previous days", key="clear_prev_days"):
+                        ok = db_manager.delete_user_meals_not_today(_uid, local_today.isoformat())
+                        if ok:
+                            st.success("Cleared older entries.")
+                            try:
+                                st.rerun()
+                            except Exception:
+                                st.experimental_rerun()
+                        else:
+                            st.error("Failed to clear older entries.")
+                st.caption("Remove any test entries; this deletes the meal and its analysis.")
+                for entry in entries:
+                    with st.container():
+                        c1, c2, c3 = st.columns([5, 3, 1])
+                        with c1:
+                            st.write(f"{entry['Time']} · {entry['Description']}")
+                        with c2:
+                            st.write(f"{entry['Calories (kcal)']} kcal · P {entry['Protein (g)']} g · C {entry['Carbs (g)']} g · F {entry['Fat (g)']} g")
+                        with c3:
+                            if st.button("Remove", key=f"remove_{entry['id']}"):
+                                ok = db_manager.delete_meal_log(entry['id'])
+                                if ok:
+                                    st.success("Removed entry.")
+                                    try:
+                                        st.rerun()
+                                    except Exception:
+                                        st.experimental_rerun()
+                                else:
+                                    st.error("Failed to remove entry.")
+            else:
+                st.info("No meals logged today. Analyze a meal above to see it here.")
+        else:
+            st.info("Please log in to view your meal analyses.")
     
     # Tab 4: Nutrition Dashboard
     with tab4:
         st.header("📊 Nutrition Dashboard")
         st.markdown("Visualize your nutrition data and track your progress")
         
-        # Generate mock data for visualization
-        nutrition_data = generate_mock_nutrition_data()
-        
+        # Real data: get plan targets and today's intake from meal analyses
+        user_id = st.session_state.user_data['id'] if st.session_state.user_data else None
+        prefs = db_manager.get_user_preferences(user_id) if user_id else {}
+        tzname = (prefs.get("timezone") or "UTC") if isinstance(prefs, dict) else "UTC"
+        plan = prefs.get("Plan_Macros") or {}
+
+        targets = {
+            "calories": float(plan.get("calories", 0) or 0),
+            "protein_g": float(plan.get("protein_g", 0) or 0),
+            "carbs_g": float(plan.get("carbs_g", 0) or 0),
+            "fat_g": float(plan.get("fat_g", 0) or 0),
+        }
+
+        # Aggregate today's totals from saved analyses (user-local)
+        local_today = datetime.now(ZoneInfo(tzname)).date()
+        totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
+        if user_id:
+            meals = db_manager.get_user_meal_logs(user_id, limit=100) or []
+            for m in meals:
+                try:
+                    mt = m.get("meal_time")
+                    # Convert UTC -> user local date
+                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.now(ZoneInfo("UTC"))
+                    dt_local = dt_utc.astimezone(ZoneInfo(tzname))
+                    if dt_local.date() != local_today:
+                        continue
+                except Exception:
+                    continue
+                ana = db_manager.get_nutrition_analysis_by_meal(m.get("id")) or {}
+                totals["calories"] += float(ana.get("calories", 0) or 0)
+                totals["protein_g"] += float(ana.get("protein_g", 0) or 0)
+                totals["carbs_g"] += float(ana.get("carbs_g", 0) or 0)
+                totals["fat_g"] += float(ana.get("fat_g", 0) or 0)
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.subheader("📈 Daily Nutrition Breakdown")
+            st.subheader("📈 Daily Nutrition Breakdown (Actual vs Target)")
+            categories = ["Calories", "Protein", "Fat", "Carbs"]
+            actual_vals = [
+                round(totals.get("calories", 0), 2),
+                round(totals.get("protein_g", 0), 2),
+                round(totals.get("fat_g", 0), 2),
+                round(totals.get("carbs_g", 0), 2),
+            ]
+            target_vals = [
+                round(targets.get("calories", 0), 2),
+                round(targets.get("protein_g", 0), 2),
+                round(targets.get("fat_g", 0), 2),
+                round(targets.get("carbs_g", 0), 2),
+            ]
+            units = ["kcal", "g", "g", "g"]
+            df_bar = pd.DataFrame({
+                "Nutrient": categories * 2,
+                "Value": actual_vals + target_vals,
+                "Type": ["Actual"] * 4 + ["Target"] * 4,
+                "Unit": units * 2,
+            })
             fig_bar = px.bar(
-                x=["Calories", "Protein (g)", "Fat (g)", "Carbs (g)"],
-                y=[2200, 120, 70, 250],
-                title="Today's Nutrition Intake",
-                color=["Calories", "Protein (g)", "Fat (g)", "Carbs (g)"],
-                color_discrete_sequence=px.colors.qualitative.Set2
+                df_bar,
+                x="Nutrient",
+                y="Value",
+                color="Type",
+                barmode="group",
+                title="Today's Intake vs Planned Target",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+                hover_data={"Unit": True, "Type": True, "Nutrient": True},
             )
-            fig_bar.update_layout(showlegend=False)
             st.plotly_chart(fig_bar, use_container_width=True)
-        
+
         with col2:
-            st.subheader("🥧 Macronutrient Distribution")
+            st.subheader("🥧 Macronutrient Distribution (by calories)")
+            p_g = max(totals.get("protein_g", 0), 0)
+            c_g = max(totals.get("carbs_g", 0), 0)
+            f_g = max(totals.get("fat_g", 0), 0)
+            # Convert to kcal contributions
+            p_kcal = 4 * p_g
+            c_kcal = 4 * c_g
+            f_kcal = 9 * f_g
+            kcal_sum = p_kcal + c_kcal + f_kcal
+            pie_vals = [
+                round((p_kcal / kcal_sum * 100.0), 2) if kcal_sum > 0 else 0,
+                round((f_kcal / kcal_sum * 100.0), 2) if kcal_sum > 0 else 0,
+                round((c_kcal / kcal_sum * 100.0), 2) if kcal_sum > 0 else 0,
+            ]
             fig_pie = px.pie(
-                values=[30, 25, 45],
+                values=pie_vals,
                 names=["Protein", "Fat", "Carbohydrates"],
-                title="Macronutrient Breakdown (%)",
-                color_discrete_sequence=px.colors.qualitative.Pastel
+                title="Macronutrient Breakdown (% of calories)",
+                color_discrete_sequence=px.colors.qualitative.Pastel,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         
@@ -871,250 +1027,276 @@ if st.session_state.authenticated:
         
         # Nutrition goals progress
         st.subheader("🎯 Goals Progress")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Daily Calories", "2,200", "50 under goal")
-        with col2:
-            st.metric("Protein", "120g", "20g over goal")
+        g1, g2, g3, g4 = st.columns(4)
+
+        def _delta_str(current: float, target: float, unit: str) -> str:
+            if target <= 0:
+                return "no target set"
+            diff = current - target
+            direction = "over" if diff > 0 else "under"
+            return f"{abs(int(round(diff)))} {unit} {direction} goal"
+
+        with g1:
+            st.metric(
+                "Calories",
+                f"{int(round(totals.get('calories', 0)))} kcal",
+                _delta_str(totals.get("calories", 0), targets.get("calories", 0), "kcal"),
+            )
+        with g2:
+            st.metric(
+                "Protein",
+                f"{int(round(totals.get('protein_g', 0)))} g",
+                _delta_str(totals.get("protein_g", 0), targets.get("protein_g", 0), "g"),
+            )
+        with g3:
+            st.metric(
+                "Carbs",
+                f"{int(round(totals.get('carbs_g', 0)))} g",
+                _delta_str(totals.get("carbs_g", 0), targets.get("carbs_g", 0), "g"),
+            )
+        with g4:
+            st.metric(
+                "Fats",
+                f"{int(round(totals.get('fat_g', 0)))} g",
+                _delta_str(totals.get("fat_g", 0), targets.get("fat_g", 0), "g"),
+            )
     
     
-    # Tab 4: Export Report
-    with tab5:
-        st.header("📝 Export Report")
-        st.markdown("Generate and download comprehensive nutrition reports")
+    # with tab5:
+    #     st.header("📝 Export Report")
+    #     st.markdown("Generate and download comprehensive nutrition reports")
         
-        st.info("🚧 **Coming Soon!** This feature is under development.")
+    #     st.info("🚧 **Coming Soon!** This feature is under development.")
         
-        col1, col2 = st.columns([2, 1])
+    #     col1, col2 = st.columns([2, 1])
         
-        with col1:
-            st.markdown("""
-            ### 📄 What will be included in your report:
+    #     with col1:
+    #         st.markdown("""
+    #         ### 📄 What will be included in your report:
             
-            - **🍽️ Meal Analysis History:** Complete log of analyzed meals with nutrition breakdowns
-            - **💬 Chat Conversations:** Your nutrition Q&A sessions with the AI assistant  
-            - **📊 Visual Charts:** Nutrition trends, macronutrient distributions, and progress tracking
-            - **🎯 Goal Progress:** How well you're meeting your nutrition and health goals
-            - **💡 Personalized Recommendations:** Tailored advice based on your profile and preferences
-            - **📈 Weekly/Monthly Summaries:** Comprehensive overview of your nutrition journey
+    #         - **🍽️ Meal Analysis History:** Complete log of analyzed meals with nutrition breakdowns
+    #         - **💬 Chat Conversations:** Your nutrition Q&A sessions with the AI assistant  
+    #         - **📊 Visual Charts:** Nutrition trends, macronutrient distributions, and progress tracking
+    #         - **🎯 Goal Progress:** How well you're meeting your nutrition and health goals
+    #         - **💡 Personalized Recommendations:** Tailored advice based on your profile and preferences
+    #         - **📈 Weekly/Monthly Summaries:** Comprehensive overview of your nutrition journey
             
-            ### 🎨 Report Formats (Future):
-            - **PDF Report:** Professional, printable format
-            - **Interactive Dashboard:** Shareable web version
-            - **CSV Data Export:** Raw data for your own analysis
-            """)
+    #         ### 🎨 Report Formats (Future):
+    #         - **PDF Report:** Professional, printable format
+    #         - **Interactive Dashboard:** Shareable web version
+    #         - **CSV Data Export:** Raw data for your own analysis
+    #         """)
         
-        with col2:
-            st.markdown("### 🔧 Export Options")
+    #     with col2:
+    #         st.markdown("### 🔧 Export Options")
             
-            report_type = st.selectbox(
-                "Report Type",
-                ["Weekly Summary", "Monthly Report", "Custom Date Range", "Complete History"]
-            )
+    #         report_type = st.selectbox(
+    #             "Report Type",
+    #             ["Weekly Summary", "Monthly Report", "Custom Date Range", "Complete History"]
+    #         )
             
-            if report_type == "Custom Date Range":
-                start_date = st.date_input("Start Date")
-                end_date = st.date_input("End Date")
+    #         if report_type == "Custom Date Range":
+    #             start_date = st.date_input("Start Date")
+    #             end_date = st.date_input("End Date")
             
-            include_charts = st.checkbox("Include Charts & Visualizations", value=True)
-            include_chat = st.checkbox("Include Chat History", value=True)
-            include_photos = st.checkbox("Include Meal Photos", value=False)
+    #         include_charts = st.checkbox("Include Charts & Visualizations", value=True)
+    #         include_chat = st.checkbox("Include Chat History", value=True)
+    #         include_photos = st.checkbox("Include Meal Photos", value=False)
             
-            st.markdown("---")
+    #         st.markdown("---")
             
-            if st.button("📄 Download Nutrition Report (Coming soon!)", type="primary", disabled=True):
-                st.info("This feature will be available in the next update!")
+    #         if st.button("📄 Download Nutrition Report (Coming soon!)", type="primary", disabled=True):
+    #             st.info("This feature will be available in the next update!")
             
-            st.markdown("""
-            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-top: 20px;">
-                <h4>📧 Get Notified</h4>
-                <p>Want to be the first to know when report generation is ready? 
-                We'll notify you via email when this feature launches!</p>
-            </div>
-            """, unsafe_allow_html=True)
+    #         st.markdown("""
+    #         <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-top: 20px;">
+    #             <h4>📧 Get Notified</h4>
+    #             <p>Want to be the first to know when report generation is ready? 
+    #             We'll notify you via email when this feature launches!</p>
+    #         </div>
+    #         """, unsafe_allow_html=True)
 
-            # Tab 5: Talk to Me (Voice Interface)
-    with tab6:
-        st.header("🎙️ Talk to Me")
-        # st.markdown(
-        #     "Have a natural conversation with your nutrition assistant using voice"
-        # )
+         
+    # with tab6:
+    #     st.header("🎙️ Talk to Me")
+    #     # st.markdown(
+    #     #     "Have a natural conversation with your nutrition assistant using voice"
+    #     # )
 
-        # Voice interface layout
-        col1, col2 = st.columns([1, 1])
+    #     # Voice interface layout
+    #     col1, col2 = st.columns([1, 1])
 
-        with col1:
-            st.markdown(
-                """
-                <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
-                    <h3>🎤 Voice Input</h3>
-                    <p>Click the microphone to start speaking</p>
-                </div>
-            """,
-                unsafe_allow_html=True,
-            )
+    #     with col1:
+    #         st.markdown(
+    #             """
+    #             <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+    #                 <h3>🎤 Voice Input</h3>
+    #                 <p>Click the microphone to start speaking</p>
+    #             </div>
+    #         """,
+    #             unsafe_allow_html=True,
+    #         )
 
-            # Voice input controls
-            voice_col1, voice_col2, voice_col3 = st.columns([1, 2, 1])
-            with voice_col2:
-                if st.button(
-                    "🎤 Start Recording", type="primary", use_container_width=True
-                ):
-                    st.info("🎙️ Voice recording feature coming soon!")
+    #         # Voice input controls
+    #         voice_col1, voice_col2, voice_col3 = st.columns([1, 2, 1])
+    #         with voice_col2:
+    #             if st.button(
+    #                 "🎤 Start Recording", type="primary", use_container_width=True
+    #             ):
+    #                 st.info("🎙️ Voice recording feature coming soon!")
 
-                if st.button("⏹️ Stop Recording", use_container_width=True):
-                    st.info("Recording stopped")
+    #             if st.button("⏹️ Stop Recording", use_container_width=True):
+    #                 st.info("Recording stopped")
 
-                if st.button("▶️ Play Recording", use_container_width=True):
-                    st.info("Playing your recording...")
+    #             if st.button("▶️ Play Recording", use_container_width=True):
+    #                 st.info("Playing your recording...")
 
-            st.markdown("---")
+    #         st.markdown("---")
 
-            # Voice settings
-            st.subheader("⚙️ Voice Settings")
-            voice_language = st.selectbox(
-                "Language",
-                [
-                    "English (US)",
-                    "English (UK)",
-                    "Spanish",
-                    "French",
-                    "German",
-                    "Italian",
-                ],
-                help="Select your preferred language for voice interaction",
-            )
+    #         # Voice settings
+    #         st.subheader("⚙️ Voice Settings")
+    #         voice_language = st.selectbox(
+    #             "Language",
+    #             [
+    #                 "English (US)",
+    #                 "English (UK)",
+    #                 "Spanish",
+    #                 "French",
+    #                 "German",
+    #                 "Italian",
+    #             ],
+    #             help="Select your preferred language for voice interaction",
+    #         )
 
-            voice_speed = st.slider(
-                "Speech Speed",
-                min_value=0.5,
-                max_value=2.0,
-                value=1.0,
-                step=0.1,
-                help="Adjust the speed of AI voice responses",
-            )
+    #         voice_speed = st.slider(
+    #             "Speech Speed",
+    #             min_value=0.5,
+    #             max_value=2.0,
+    #             value=1.0,
+    #             step=0.1,
+    #             help="Adjust the speed of AI voice responses",
+    #         )
 
-            voice_pitch = st.selectbox(
-                "Voice Type",
-                ["Natural", "Friendly", "Professional", "Calm"],
-                help="Choose the tone of the AI voice",
-            )
+    #         voice_pitch = st.selectbox(
+    #             "Voice Type",
+    #             ["Natural", "Friendly", "Professional", "Calm"],
+    #             help="Choose the tone of the AI voice",
+    #         )
 
-        with col2:
-            st.markdown(
-                """
-                <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
-                    <h3>🔊 AI Response</h3>
-                    <p>Listen to personalized nutrition advice</p>
-                </div>
-            """,
-                unsafe_allow_html=True,
-            )
+    #     with col2:
+    #         st.markdown(
+    #             """
+    #             <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+    #                 <h3>🔊 AI Response</h3>
+    #                 <p>Listen to personalized nutrition advice</p>
+    #             </div>
+    #         """,
+    #             unsafe_allow_html=True,
+    #         )
 
-            # AI Response area
-            with st.container():
-                st.markdown(
-                    """
-                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; min-height: 200px;">
-                        <h5>💬 AI Assistant Response:</h5>
-                        <p style="color: #6c757d; font-style: italic;">
-                            Your AI nutrition assistant will respond here with personalized advice based on your voice input.
-                        </p>
-                        <div style="margin-top: 20px;">
-                            <p><strong>🎯 Example Topics You Can Ask About:</strong></p>
-                            <ul>
-                                <li>🥗 "What should I eat for breakfast?"</li>
-                                <li>💪 "How much protein do I need daily?"</li>
-                                <li>🏃 "Pre-workout meal suggestions?"</li>
-                                <li>😴 "Foods that help with sleep?"</li>
-                                <li>🎂 "Healthy dessert alternatives?"</li>
-                            </ul>
-                        </div>
-                    </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    #         # AI Response area
+    #         with st.container():
+    #             st.markdown(
+    #                 """
+    #                 <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; min-height: 200px;">
+    #                     <h5>💬 AI Assistant Response:</h5>
+    #                     <p style="color: #6c757d; font-style: italic;">
+    #                         Your AI nutrition assistant will respond here with personalized advice based on your voice input.
+    #                     </p>
+    #                     <div style="margin-top: 20px;">
+    #                         <p><strong>🎯 Example Topics You Can Ask About:</strong></p>
+    #                         <ul>
+    #                             <li>🥗 "What should I eat for breakfast?"</li>
+    #                             <li>💪 "How much protein do I need daily?"</li>
+    #                             <li>🏃 "Pre-workout meal suggestions?"</li>
+    #                             <li>😴 "Foods that help with sleep?"</li>
+    #                             <li>🎂 "Healthy dessert alternatives?"</li>
+    #                         </ul>
+    #                     </div>
+    #                 </div>
+    #             """,
+    #             unsafe_allow_html=True,
+    #         )
 
-            st.markdown("---")
+    #         st.markdown("---")
 
-            # Voice response controls
-            response_col1, response_col2 = st.columns(2)
-            with response_col1:
-                if st.button(
-                    "🔊 Play AI Response", type="secondary", use_container_width=True
-                ):
-                    st.info("🔊 AI voice response feature coming soon!")
+    #         # Voice response controls
+    #         response_col1, response_col2 = st.columns(2)
+    #         with response_col1:
+    #             if st.button(
+    #                 "🔊 Play AI Response", type="secondary", use_container_width=True
+    #             ):
+    #                 st.info("🔊 AI voice response feature coming soon!")
 
-            with response_col2:
-                if st.button("📋 Save Conversation", use_container_width=True):
-                    st.success("Conversation saved to your chat history!")
+    #         with response_col2:
+    #             if st.button("📋 Save Conversation", use_container_width=True):
+    #                 st.success("Conversation saved to your chat history!")
 
-        st.markdown("---")
+    #     st.markdown("---")
 
-        # Conversation history for voice interactions
-        st.subheader("📜 Voice Conversation History")
+    #     # Conversation history for voice interactions
+    #     st.subheader("📜 Voice Conversation History")
 
-        # Mock conversation history
-        with st.expander("🗣️ Recent Voice Conversations", expanded=False):
-            conversation_history = [
-                {
-                    "timestamp": "2024-01-15 14:30",
-                    "user_input": "What's a good post-workout meal?",
-                    "ai_response": "For post-workout recovery, I recommend a combination of protein and carbohydrates. Try grilled chicken with quinoa and vegetables, or a protein smoothie with banana and Greek yogurt.",
-                },
-                {
-                    "timestamp": "2024-01-15 10:15",
-                    "user_input": "How much water should I drink daily?",
-                    "ai_response": "Generally, aim for 8-10 glasses of water daily, but this can vary based on your activity level, climate, and body size. If you're active, you'll need more to replace fluids lost through sweat.",
-                },
-                {
-                    "timestamp": "2024-01-14 16:45",
-                    "user_input": "Are there any healthy midnight snack options?",
-                    "ai_response": "For late-night snacking, choose light, easily digestible options like Greek yogurt with berries, a small handful of nuts, or herbal tea with a piece of fruit.",
-                },
-            ]
+    #     # Mock conversation history
+    #     with st.expander("🗣️ Recent Voice Conversations", expanded=False):
+    #         conversation_history = [
+    #             {
+    #                 "timestamp": "2024-01-15 14:30",
+    #                 "user_input": "What's a good post-workout meal?",
+    #                 "ai_response": "For post-workout recovery, I recommend a combination of protein and carbohydrates. Try grilled chicken with quinoa and vegetables, or a protein smoothie with banana and Greek yogurt.",
+    #             },
+    #             {
+    #                 "timestamp": "2024-01-15 10:15",
+    #                 "user_input": "How much water should I drink daily?",
+    #                 "ai_response": "Generally, aim for 8-10 glasses of water daily, but this can vary based on your activity level, climate, and body size. If you're active, you'll need more to replace fluids lost through sweat.",
+    #             },
+    #             {
+    #                 "timestamp": "2024-01-14 16:45",
+    #                 "user_input": "Are there any healthy midnight snack options?",
+    #                 "ai_response": "For late-night snacking, choose light, easily digestible options like Greek yogurt with berries, a small handful of nuts, or herbal tea with a piece of fruit.",
+    #             },
+    #         ]
 
-            for i, conv in enumerate(conversation_history):
-                with st.container():
-                    st.markdown(
-                        f"""
-                        <div style="background-color: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-                            <p style="color: #666; font-size: 12px; margin-bottom: 8px;">📅 {conv['timestamp']}</p>
-                            <div style="background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 8px;">
-                                <strong>🗣️ You:</strong> {conv['user_input']}
-                            </div>
-                            <div style="background-color: #f3e5f5; padding: 10px; border-radius: 5px;">
-                                <strong>🤖 AI:</strong> {conv['ai_response']}
-                            </div>
-                        </div>
-                    """,
-                        unsafe_allow_html=True,
-                    )
+    #         for i, conv in enumerate(conversation_history):
+    #             with st.container():
+    #                 st.markdown(
+    #                     f"""
+    #                     <div style="background-color: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+    #                         <p style="color: #666; font-size: 12px; margin-bottom: 8px;">📅 {conv['timestamp']}</p>
+    #                         <div style="background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 8px;">
+    #                             <strong>🗣️ You:</strong> {conv['user_input']}
+    #                         </div>
+    #                         <div style="background-color: #f3e5f5; padding: 10px; border-radius: 5px;">
+    #                             <strong>🤖 AI:</strong> {conv['ai_response']}
+    #                         </div>
+    #                     </div>
+    #                 """,
+    #                     unsafe_allow_html=True,
+    #                 )
 
-        # Feature information
-        st.markdown("---")
-        st.info(
-            """
-            🚧 **Voice Features Coming Soon!**
+    #     # Feature information
+    #     st.markdown("---")
+    #     st.info(
+    #         """
+    #         🚧 **Voice Features Coming Soon!**
             
-            This voice interface will include:
-            - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
-            - 🔊 **AI voice responses** - Hear personalized advice in natural speech
-            - 🌐 **Multi-language support** - Communicate in your preferred language
-            - 💾 **Voice conversation history** - All voice interactions saved automatically
-            - 🎯 **Context awareness** - AI remembers your preferences and dietary needs
-            - 📱 **Mobile optimized** - Perfect for hands-free nutrition guidance
-        """
-        )
+    #         This voice interface will include:
+    #         - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
+    #         - 🔊 **AI voice responses** - Hear personalized advice in natural speech
+    #         - 🌐 **Multi-language support** - Communicate in your preferred language
+    #         - 💾 **Voice conversation history** - All voice interactions saved automatically
+    #         - 🎯 **Context awareness** - AI remembers your preferences and dietary needs
+    #         - 📱 **Mobile optimized** - Perfect for hands-free nutrition guidance
+    #     """
+    #     )
         
-    # Tab 6: Talk to Me (no additional content here; Talk to Me content is under tab5)
+
 else:
     # Welcome screen for non-authenticated users
     st.markdown(
         """
         <div style="text-align: center; padding: 50px;">
-            <h2>🥗 <b>Welcome to Nutrion</b> 🥗</h2>
+            <h2>🍚 <b>Welcome to Nutrion</b> 🥗</h2>
             <h4>Smart Nutrition and Diet Assistant</h4>
             <p style="font-size: 15px; color: #666; margin: 30px 0;">
                 Your personal AI-powered nutrition companion for healthier eating habits
@@ -1133,6 +1315,7 @@ else:
                 </div>
                 <p>  
                     🧠 AI-powered nutrition Q&A: Ask questions and get expert advice
+                    <br><br>⚖️ Macronutrient analysis: Suggest macronutrient percent  
                     <br><br>🍽️ Smart meal analysis: Analyze meals with photos and descriptions 
                     <br><br>📊 Interactive dashboards: Track your progress with beautiful charts
                     <br><br>📝 Comprehensive reports: Generate comprehensive nutrition reports

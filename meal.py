@@ -8,7 +8,9 @@ from typing import Dict, Any, Optional, List
 load_dotenv()
 client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
 
-SCHEMA = '{"calories": int, "protein_g": int, "carbs_g": int, "fats_g": int, "meals": {"breakfast": str, "lunch": str, "snack": str, "dinner": str}, "notes": str}'
+# SCHEMA = '{"calories": int, "protein_g": int, "carbs_g": int, "fats_g": int, "meals": {"breakfast": str, "lunch": str, "snack": str, "dinner": str}, "notes": str}'
+
+SCHEMA = '{"calories": int, "protein_g": int, "carbs_g": int, "fats_g": int, "meals": {"breakfast": str, "lunch": str, "snack": str, "dinner": str}}'
 
 INSTRUCTION = (
     "You are a nutrition assistant. Given the user's profile, recommend a daily macro breakdown and food suggestions. "

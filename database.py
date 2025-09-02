@@ -260,6 +260,95 @@ class DatabaseManager:
         except Exception as e:
             st.error(f"Error saving nutrition analysis: {str(e)}")
             return False
+
+    def delete_meal_log(self, meal_log_id: str) -> bool:
+        """Delete a meal log and its associated nutrition analysis records."""
+        try:
+            if self.engine:
+                with self.engine.connect() as conn:
+                    # Delete analyses first (if FK constraints exist)
+                    conn.execute(
+                        text("DELETE FROM nutrition_analysis WHERE meal_log_id = :meal_log_id"),
+                        {"meal_log_id": meal_log_id},
+                    )
+                    conn.execute(
+                        text("DELETE FROM meal_logs WHERE id = :meal_log_id"),
+                        {"meal_log_id": meal_log_id},
+                    )
+                    conn.commit()
+                    return True
+            else:
+                # Session-state fallback
+                if 'nutrition_analysis' in st.session_state:
+                    st.session_state.nutrition_analysis = [
+                        a for a in st.session_state.nutrition_analysis if a.get('meal_log_id') != meal_log_id
+                    ]
+                if 'meal_logs' in st.session_state:
+                    st.session_state.meal_logs = [
+                        m for m in st.session_state.meal_logs if m.get('id') != meal_log_id
+                    ]
+                return True
+        except Exception as e:
+            st.error(f"Error deleting meal log: {str(e)}")
+            return False
+
+    def delete_user_meals_not_today(self, user_id: str, today_iso_date: str) -> bool:
+        """Delete all meal logs and analyses for a user that are NOT from the provided ISO date (YYYY-MM-DD)."""
+        try:
+            if self.engine:
+                with self.engine.connect() as conn:
+                    # Delete analyses referencing non-today meal logs for this user
+                    conn.execute(
+                        text(
+                            """
+                            DELETE FROM nutrition_analysis
+                            WHERE meal_log_id IN (
+                                SELECT id FROM meal_logs
+                                WHERE user_id = :user_id AND CAST(meal_time AS DATE) <> CAST(:today AS DATE)
+                            )
+                            """
+                        ),
+                        {"user_id": user_id, "today": today_iso_date},
+                    )
+                    # Delete non-today meal logs for this user
+                    conn.execute(
+                        text(
+                            """
+                            DELETE FROM meal_logs
+                            WHERE user_id = :user_id AND CAST(meal_time AS DATE) <> CAST(:today AS DATE)
+                            """
+                        ),
+                        {"user_id": user_id, "today": today_iso_date},
+                    )
+                    conn.commit()
+                    return True
+            else:
+                # Session-state fallback: keep only today's logs for user
+                meals = st.session_state.get('meal_logs', [])
+                todays_ids = set()
+                keep_meals = []
+                from datetime import datetime as _dt
+                for m in meals:
+                    if m.get('user_id') != user_id:
+                        keep_meals.append(m)
+                        continue
+                    mt = m.get('meal_time')
+                    try:
+                        dt = _dt.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else _dt.now()
+                        if dt.date().isoformat() == today_iso_date:
+                            keep_meals.append(m)
+                            todays_ids.add(m.get('id'))
+                    except Exception:
+                        # If cannot parse, treat as non-today and drop
+                        pass
+                st.session_state.meal_logs = keep_meals
+                # Drop analyses not linked to today's kept meal ids
+                analyses = st.session_state.get('nutrition_analysis', [])
+                st.session_state.nutrition_analysis = [a for a in analyses if a.get('meal_log_id') in todays_ids]
+                return True
+        except Exception as e:
+            st.error(f"Error deleting non-today meals: {str(e)}")
+            return False
     
     def get_user_meal_logs(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get recent meal logs for a user"""
@@ -305,11 +394,43 @@ class DatabaseManager:
     def get_nutrition_analysis_by_meal(self, meal_log_id: str) -> Optional[Dict]:
         """Get nutrition analysis for a specific meal"""
         try:
-            analyses = st.session_state.nutrition_analysis
-            for analysis in analyses:
-                if analysis['meal_log_id'] == meal_log_id:
-                    return analysis
-            return None
+            if self.engine:
+                # Use Supabase database (engine-backed): fetch latest analysis for the meal
+                with self.engine.connect() as conn:
+                    result = conn.execute(
+                        text(
+                            """
+                            SELECT id, meal_log_id, calories, protein_g, carbs_g, fat_g, sugar_g, fiber_g, recommendation, created_at
+                            FROM nutrition_analysis
+                            WHERE meal_log_id = :meal_log_id
+                            ORDER BY created_at DESC
+                            LIMIT 1
+                            """
+                        ),
+                        {"meal_log_id": meal_log_id}
+                    )
+                    row = result.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        'id': str(row[0]),
+                        'meal_log_id': str(row[1]),
+                        'calories': float(row[2] or 0),
+                        'protein_g': float(row[3] or 0),
+                        'carbs_g': float(row[4] or 0),
+                        'fat_g': float(row[5] or 0),
+                        'sugar_g': float(row[6] or 0),
+                        'fiber_g': float(row[7] or 0),
+                        'recommendation': row[8],
+                        'created_at': row[9].isoformat() if hasattr(row[9], 'isoformat') else str(row[9]),
+                    }
+            else:
+                # Fallback to session state
+                analyses = st.session_state.get('nutrition_analysis', [])
+                for analysis in analyses:
+                    if analysis.get('meal_log_id') == meal_log_id:
+                        return analysis
+                return None
             
         except Exception as e:
             st.error(f"Error retrieving nutrition analysis: {str(e)}")
