@@ -48,4 +48,4 @@ trafilatura==1.6.3
 python-frontmatter==1.0.1
 
 # Pin mistralai for reproducible builds
-mistralai==1.9.10
+mistralai==1.0.0
