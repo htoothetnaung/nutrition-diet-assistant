@@ -1,9 +1,14 @@
 # Core Streamlit and web framework
 streamlit==1.33.0
 
+# Build tools (prefer wheels; faster installs)
+pip>=24.0
+setuptools>=70.0
+wheel>=0.43.0
+
 # Data manipulation and analysis
-pandas==2.2.2
-numpy==1.26.4
+pandas==2.2.3
+numpy==2.3.2
 
 # Data visualization
 plotly==5.22.0
@@ -39,7 +44,7 @@ beautifulsoup4==4.12.3
 # Use langchain-community for Supabase integration instead of specific package
 
 # Pin mistralai for reproducible builds
-mistralai==1.2.7
+mistralai==1.9.10
 
 # # Timezone data for zoneinfo on Linux/Cloud
 # tzdata==2025.1
