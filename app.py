@@ -40,7 +40,20 @@ try:
 except Exception:
     # Secrets may not be available locally; ignore
     pass
+
 os.environ.setdefault("USER_AGENT", "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
+
+# Hide native browser overlays only (keep Streamlit's show-password toggle visible)
+st.markdown(
+    """
+    <style>
+      /* Edge/IE native reveal & clear icons */
+      input[type="password"]::-ms-reveal,
+      input[type="password"]::-ms-clear { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Import Mistral-based planner AFTER env is loaded
 from meal import get_plan_json
