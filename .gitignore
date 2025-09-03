@@ -70,3 +70,5 @@ api_test.py
 # test.py
 
 data
+
+secrets.toml

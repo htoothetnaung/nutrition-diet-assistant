@@ -1,4 +1,10 @@
 import streamlit as st
+# Page configuration MUST be the first Streamlit command
+st.set_page_config(
+    page_title="Nutrion",
+    layout="wide",
+    page_icon="🥗",
+)
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -22,6 +28,18 @@ import json
 
 # Load .env and set env defaults BEFORE importing any RAG modules
 load_dotenv()
+# Streamlit Cloud: mirror st.secrets into environment without altering existing code
+# (kept existing env-based reads; this just supplies values when running on Streamlit)
+try:
+    if hasattr(st, "secrets") and st.secrets:
+        for k, v in st.secrets.items():
+            # Only map flat key/value pairs; skip nested tables
+            if isinstance(v, (dict, list)):
+                continue
+            os.environ.setdefault(k, str(v))
+except Exception:
+    # Secrets may not be available locally; ignore
+    pass
 os.environ.setdefault("USER_AGENT", "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
 
 # Import Mistral-based planner AFTER env is loaded
@@ -53,12 +71,7 @@ except Exception:
     # Defer import errors to UI when initializing RAG
     pass
 
-# Page configuration
-st.set_page_config(
-    page_title="Nutrion", 
-    layout="wide",
-    page_icon="🥗"
-)
+# Page configuration moved to top to satisfy Streamlit requirement
 
 # Initialize managers
 if 'auth_manager' not in st.session_state:
