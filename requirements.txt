@@ -1,9 +1,14 @@
 # Core Streamlit and web framework
 streamlit==1.33.0
 
-# Data manipulation and analysis
-pandas==2.2.2
-numpy==1.26.4
+# Build tools (prefer wheels; faster installs on Streamlit Cloud)
+pip>=24.0
+setuptools>=70.0
+wheel>=0.43.0
+
+# Data manipulation and analysis (Python 3.13-compatible wheels)
+pandas==2.2.3
+numpy==2.3.2
 
 # Data visualization
 plotly==5.22.0
