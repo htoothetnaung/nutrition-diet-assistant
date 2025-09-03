@@ -38,7 +38,11 @@ beautifulsoup4==4.12.3
 # Removed chromadb as we're using Supabase
 # Use langchain-community for Supabase integration instead of specific package
 
-mistralai
+# Pin mistralai for reproducible builds
+mistralai==1.2.7
+
+# # Timezone data for zoneinfo on Linux/Cloud
+# tzdata==2025.1
 
 # Crawling & content extraction for KB (web -> Markdown)
 requests==2.32.3

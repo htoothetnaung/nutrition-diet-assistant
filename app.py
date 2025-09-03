@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+ 
 from auth import AuthManager
 from database import DatabaseManager
 from chat_manager import ChatManager
@@ -177,8 +177,6 @@ with st.sidebar:
             st.rerun()
         
         st.divider()
-        # st.subheader("⚙️ Settings")
-        # st.info("User preferences and settings will be available here in future updates.")
 
 # Main app content
 if st.session_state.authenticated:
@@ -824,10 +822,8 @@ if st.session_state.authenticated:
         st.subheader("📒 Today's Logged Meals")
         if st.session_state.user_data:
             _uid = st.session_state.user_data['id']
-            # Load user timezone from preferences; default to UTC
-            _prefs = db_manager.get_user_preferences(_uid) if _uid else {}
-            _tzname = (_prefs.get("timezone") or "UTC") if isinstance(_prefs, dict) else "UTC"
-            local_today = datetime.now(ZoneInfo(_tzname)).date()
+            # Use UTC-based 'today' and UTC timestamps (no timezone conversion)
+            today_utc = datetime.utcnow().date()
             logs = db_manager.get_user_meal_logs(_uid, limit=100) or []
             rows = []
             entries = []  # keep ids for per-row controls
@@ -835,9 +831,8 @@ if st.session_state.authenticated:
             for m in logs:
                 try:
                     mt = m.get("meal_time")
-                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.now(ZoneInfo("UTC"))
-                    dt_local = dt_utc.astimezone(ZoneInfo(_tzname))
-                    if dt_local.date() != local_today:
+                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.utcnow()
+                    if dt_utc.date() != today_utc:
                         continue
                 except Exception:
                     continue
@@ -849,7 +844,6 @@ if st.session_state.authenticated:
                 fib = float(ana.get("fiber_g", 0) or 0)
                 sug = float(ana.get("sugar_g", 0) or 0)
                 row = {
-                    "Time": dt_local.strftime("%H:%M"),
                     "Description": m.get("meal_description", "-"),
                     "Calories (kcal)": round(cal, 1),
                     "Protein (g)": round(pr, 1),
@@ -873,7 +867,7 @@ if st.session_state.authenticated:
             if rows:
                 with st.expander("Maintenance", expanded=False):
                     if st.button("Clear previous days", key="clear_prev_days"):
-                        ok = db_manager.delete_user_meals_not_today(_uid, local_today.isoformat())
+                        ok = db_manager.delete_user_meals_not_today(_uid, today_utc.isoformat())
                         if ok:
                             st.success("Cleared older entries.")
                             try:
@@ -885,11 +879,16 @@ if st.session_state.authenticated:
                 st.caption("Remove any test entries; this deletes the meal and its analysis.")
                 for entry in entries:
                     with st.container():
-                        c1, c2, c3 = st.columns([5, 3, 1])
+                        c1, c2, c3 = st.columns([6, 4, 1])
                         with c1:
-                            st.write(f"{entry['Time']} · {entry['Description']}")
+                            st.write(f"{entry['Description']}")
                         with c2:
-                            st.write(f"{entry['Calories (kcal)']} kcal · P {entry['Protein (g)']} g · C {entry['Carbs (g)']} g · F {entry['Fat (g)']} g")
+                            st.write(
+                                f"{entry['Calories (kcal)']} kcal · "
+                                f"Protein: {entry['Protein (g)']} g · "
+                                f"Carbs: {entry['Carbs (g)']} g · "
+                                f"Fat: {entry['Fat (g)']} g"
+                            )
                         with c3:
                             if st.button("Remove", key=f"remove_{entry['id']}"):
                                 ok = db_manager.delete_meal_log(entry['id'])
@@ -914,7 +913,6 @@ if st.session_state.authenticated:
         # Real data: get plan targets and today's intake from meal analyses
         user_id = st.session_state.user_data['id'] if st.session_state.user_data else None
         prefs = db_manager.get_user_preferences(user_id) if user_id else {}
-        tzname = (prefs.get("timezone") or "UTC") if isinstance(prefs, dict) else "UTC"
         plan = prefs.get("Plan_Macros") or {}
 
         targets = {
@@ -924,18 +922,16 @@ if st.session_state.authenticated:
             "fat_g": float(plan.get("fat_g", 0) or 0),
         }
 
-        # Aggregate today's totals from saved analyses (user-local)
-        local_today = datetime.now(ZoneInfo(tzname)).date()
+        # Aggregate today's totals from saved analyses (UTC-based)
+        today_utc = datetime.utcnow().date()
         totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
         if user_id:
             meals = db_manager.get_user_meal_logs(user_id, limit=100) or []
             for m in meals:
                 try:
                     mt = m.get("meal_time")
-                    # Convert UTC -> user local date
-                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.now(ZoneInfo("UTC"))
-                    dt_local = dt_utc.astimezone(ZoneInfo(tzname))
-                    if dt_local.date() != local_today:
+                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.utcnow()
+                    if dt_utc.date() != today_utc:
                         continue
                 except Exception:
                     continue
