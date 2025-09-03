@@ -1,5 +1,5 @@
 # Core Streamlit and web framework
-streamlit==1.33.0
+streamlit>=1.38.0
 
 # Build tools (prefer wheels; faster installs)
 pip>=24.0
@@ -15,7 +15,7 @@ plotly==5.22.0
 
 # Database and ORM
 sqlalchemy==2.0.30
-psycopg2-binary==2.9.9
+# psycopg2-binary==2.9.9   # Only needed if you connect directly to PostgreSQL
 
 # Supabase integration
 supabase==2.7.4
@@ -33,23 +33,19 @@ python-dateutil==2.9.0.post0
 httpx==0.27.2
 httpcore==1.0.5
 
+# LangChain ecosystem
 langchain==0.3.27
 langchain-community==0.3.27
 langchain-google-genai==2.1.9
 langchain-text-splitters==0.3.9
 langsmith==0.4.5
+
+# PDF and scraping
 pypdf==4.2.0
 beautifulsoup4==4.12.3
-# Removed chromadb as we're using Supabase
-# Use langchain-community for Supabase integration instead of specific package
-
-# Pin mistralai for reproducible builds
-mistralai==1.9.10
-
-# # Timezone data for zoneinfo on Linux/Cloud
-# tzdata==2025.1
-
-# Crawling & content extraction for KB (web -> Markdown)
 requests==2.32.3
 trafilatura==1.6.3
 python-frontmatter==1.0.1
+
+# Pin mistralai for reproducible builds
+mistralai==1.9.10
