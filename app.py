@@ -25,6 +25,8 @@ import sys
 from dotenv import load_dotenv
 import asyncio
 import json
+from PIL import Image
+from food_vision import NutriNetVision
 
 # Load .env and set env defaults BEFORE importing any RAG modules
 load_dotenv()
@@ -221,10 +223,10 @@ if st.session_state.authenticated:
     # Create tabs
     # tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard", "📝 Export Report", "🎙️ Talk to Me"])
     
-    tab1, tab2, tab3, tab4 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard"])
+    tab1, tab2, tab3, tab4 = st.tabs(["⚖️ Nutrition Plan", "🧠 Ask Anything", "🍽 Meal Analyzer", "📊 Nutrition Dashboard"])
 
-    # Tab 1: Ask Anything (ChatGPT-like Interface)
-    with tab1:
+    # Tab 2: Ask Anything (ChatGPT-like Interface)
+    with tab2:
         # Create two columns for chat sessions and chat interface
         col1, col2 = st.columns([0.6, 3.4], gap="medium")
 
@@ -552,8 +554,8 @@ if st.session_state.authenticated:
                     else:
                         st.error("Please log in to start chatting!")
 
-    # Tab 2: AI Nutrition Plan (moved here)
-    with tab2:
+    # Tab 1: AI Nutrition Plan
+    with tab1:
         st.header("⚖️ AI Nutrition Plan")
         st.markdown("Fill in your details to generate a personalized daily nutrition plan.")
 
@@ -728,16 +730,19 @@ if st.session_state.authenticated:
             height=100
         )
         
-        st.subheader("📸 Meal Photo (coming soon)")
+        st.subheader("📸 Meal Photo")
         uploaded_file = st.file_uploader(
             "Upload a photo of your meal (optional)",
-            type=['png', 'jpg', 'jpeg'],
-            help="Image upload is disabled for now. Analysis coming soon.",
-            disabled=True
+            type=['png', 'jpg', 'jpeg']
         )
         
         if uploaded_file is not None:
-            st.image(uploaded_file, caption="Uploaded meal photo", use_column_width=True)
+            # Avoid showing duplicate image preview; will show once after analysis
+            try:
+                fname = getattr(uploaded_file, 'name', 'image')
+                st.caption(f"Uploaded: {fname}")
+            except Exception:
+                pass
         
         
         st.divider()
@@ -745,7 +750,7 @@ if st.session_state.authenticated:
         # Analysis buttons and results
         btn_col1, btn_col2 = st.columns([1,1])
         analyze_text = btn_col1.button("🔍 Analyze Meal", type="primary")
-        analyze_image = btn_col2.button("🖼️ Analyze Image (coming soon)", disabled=True)
+        analyze_image = btn_col2.button("🖼️ Analyze Image")
 
         if analyze_text:
             if meal_description:
@@ -839,7 +844,71 @@ if st.session_state.authenticated:
             if uploaded_file is None:
                 st.warning("Upload a meal photo first.")
             else:
-                st.info("Image-based nutrition analysis will be available in a future update.")
+                try:
+                    # Initialize vision model once per session
+                    if 'nutrinet_vision' not in st.session_state:
+                        with st.spinner("Loading food vision model..."):
+                            st.session_state.nutrinet_vision = NutriNetVision()
+
+                    image = Image.open(uploaded_file).convert("RGB")
+                    # Show a single, reasonably-sized preview
+                    st.image(image, caption="Meal photo", width=400)
+
+                    with st.spinner("Analyzing image..."):
+                        results = st.session_state.nutrinet_vision.analyze_image(image)
+
+                    if not results:
+                        st.error("No result from image analyzer.")
+                    else:
+                        item = results[0]
+                        name = item.get("name", "unknown_food")
+                        conf = float(item.get("confidence", 0.0))
+                        portion = float(item.get("portion", 0.0))
+                        nutrition = item.get("nutrition", {}) or {}
+                        advice = item.get("health_advice", "")
+
+                        st.success(f"Prediction: {name} ({conf*100:.1f}% confidence)")
+                        st.caption(f"Estimated portion: {int(round(portion))} g")
+
+                        # Show nutrition table
+                        st.subheader("📊 Estimated Nutrition (scaled)")
+                        rows = [{
+                            "Calories (kcal)": nutrition.get("calories", 0),
+                            "Protein (g)": nutrition.get("protein_g", 0),
+                            "Carbs (g)": nutrition.get("carbs_g", 0),
+                            "Fat (g)": nutrition.get("fat_g", 0),
+                            "Fiber (g)": nutrition.get("fiber_g", 0),
+                        }]
+                        st.dataframe(rows, use_container_width=True)
+
+                        if advice:
+                            st.info(f"💡 {advice}")
+
+                        # Persist to DB
+                        if st.session_state.user_data:
+                            meal_desc = meal_description or f"Image: {name}"
+                            meal_log_id = db_manager.save_meal_log(
+                                st.session_state.user_data['id'],
+                                meal_desc,
+                                uploaded_file.name if hasattr(uploaded_file, 'name') else None,
+                            )
+                            db_manager.save_nutrition_analysis(
+                                meal_log_id,
+                                calories=float(nutrition.get('calories', 0) or 0),
+                                protein=float(nutrition.get('protein_g', 0) or 0),
+                                carbs=float(nutrition.get('carbs_g', 0) or 0),
+                                fat=float(nutrition.get('fat_g', 0) or 0),
+                                recommendation="Image-based estimate (Food-101)",
+                                sugar=float(nutrition.get('sugar_g', 0) or 0),
+                                fiber=float(nutrition.get('fiber_g', 0) or 0),
+                            )
+                            st.success("Saved analysis to your log.")
+                        else:
+                            st.info("Login to save this analysis to your history.")
+                except FileNotFoundError as e:
+                    st.error(f"Food-101 model not found. {e}. Place weights at model_weights/food101_model.pth")
+                except Exception as e:
+                    st.error(f"Image analysis failed: {e}")
 
         # Removed inline AI Nutrition Plan; now in separate tab
 

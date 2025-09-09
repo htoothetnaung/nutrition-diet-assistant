@@ -49,3 +49,14 @@ python-frontmatter==1.0.1
 
 # Pin mistralai for reproducible builds
 mistralai==1.0.0
+
+# Document editing for report insertion
+python-docx==1.1.2
+
+# Image analysis (Food-101)
+Pillow==10.4.0
+# For CPU installs of PyTorch on Windows, use the official wheels if pip resolve fails.
+torch==2.5.1
+torchvision==0.20.1
+# Optional: broader model backbone support (not required)
+# timm==1.0.9
