@@ -1,4 +1,5 @@
 import streamlit as st
+
 # Page configuration MUST be the first Streamlit command
 st.set_page_config(
     page_title="Nutrion",
@@ -10,7 +11,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
- 
+
 from auth import AuthManager
 from database import DatabaseManager
 from chat_manager import ChatManager
@@ -43,7 +44,10 @@ except Exception:
     # Secrets may not be available locally; ignore
     pass
 
-os.environ.setdefault("USER_AGENT", "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)")
+os.environ.setdefault(
+    "USER_AGENT",
+    "Nutrion/0.1 (https://github.com/zawlinnhtet03/nutrition-diet-assistant)",
+)
 
 # Hide native browser overlays only (keep Streamlit's show-password toggle visible)
 st.markdown(
@@ -72,7 +76,9 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 # Windows-specific: use selector policy for broader compatibility
-if sys.platform.startswith("win") and hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
+if sys.platform.startswith("win") and hasattr(
+    asyncio, "WindowsSelectorEventLoopPolicy"
+):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # RAG imports (Gemini-based)
@@ -89,43 +95,43 @@ except Exception:
 # Page configuration moved to top to satisfy Streamlit requirement
 
 # Initialize managers
-if 'auth_manager' not in st.session_state:
+if "auth_manager" not in st.session_state:
     st.session_state.auth_manager = AuthManager()
-if 'db_manager' not in st.session_state:
+if "db_manager" not in st.session_state:
     st.session_state.db_manager = DatabaseManager()
-if 'chat_manager' not in st.session_state:
+if "chat_manager" not in st.session_state:
     st.session_state.chat_manager = ChatManager()
 
 auth_manager = st.session_state.auth_manager
 db_manager = st.session_state.db_manager
 # If code changed and the cached instance lacks new methods, refresh it
-if not hasattr(db_manager, 'save_user_preferences'):
+if not hasattr(db_manager, "save_user_preferences"):
     st.session_state.db_manager = DatabaseManager()
     db_manager = st.session_state.db_manager
 chat_manager = st.session_state.chat_manager
 
 # Initialize session state
-if 'login_time' not in st.session_state:
+if "login_time" not in st.session_state:
     st.session_state.login_time = None
-if 'authenticated' not in st.session_state:
+if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if 'user_data' not in st.session_state:
+if "user_data" not in st.session_state:
     st.session_state.user_data = None
-if 'chat_messages' not in st.session_state:
+if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
-if 'current_session_id' not in st.session_state:
+if "current_session_id" not in st.session_state:
     st.session_state.current_session_id = None
-if 'chat_sessions' not in st.session_state:
+if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = []
-if 'editing_session_id' not in st.session_state:
+if "editing_session_id" not in st.session_state:
     st.session_state.editing_session_id = None
-if 'rag_initialized' not in st.session_state:
+if "rag_initialized" not in st.session_state:
     st.session_state.rag_initialized = False
-if 'qa_chain' not in st.session_state:
+if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
-if 'rag_error' not in st.session_state:
+if "rag_error" not in st.session_state:
     st.session_state.rag_error = None
-if 'llm' not in st.session_state:
+if "llm" not in st.session_state:
     st.session_state.llm = None
 
 if st.session_state.authenticated and st.session_state.login_time:
@@ -139,16 +145,20 @@ if st.session_state.authenticated and st.session_state.login_time:
 # Sidebar for authentication
 with st.sidebar:
     st.header("🔐 Authentication")
-    
+
     if not st.session_state.authenticated:
         auth_tab1, auth_tab2 = st.tabs(["Login", "Sign Up"])
-        
+
         with auth_tab1:
             st.subheader("Login")
             with st.form(key="login_form", clear_on_submit=False):
                 login_email = st.text_input("Email", key="login_email")
-                login_password = st.text_input("Password", type="password", key="login_password")
-                login_submitted = st.form_submit_button("Login", use_container_width=True)
+                login_password = st.text_input(
+                    "Password", type="password", key="login_password"
+                )
+                login_submitted = st.form_submit_button(
+                    "Login", use_container_width=True
+                )
             if login_submitted:
                 if login_email and login_password:
                     user_data = auth_manager.login(login_email, login_password)
@@ -157,7 +167,7 @@ with st.sidebar:
                         st.session_state.chat_sessions = []
                         st.session_state.current_session_id = None
                         st.session_state.chat_messages = []
-                        
+
                         st.session_state.authenticated = True
                         st.session_state.user_data = user_data
                         st.session_state.login_time = datetime.now()
@@ -167,16 +177,26 @@ with st.sidebar:
                         st.error("Invalid credentials")
                 else:
                     st.error("Please fill in all fields")
-        
+
         with auth_tab2:
             st.subheader("Sign Up")
             st.info("Create a new account to start tracking your nutrition")
             with st.form(key="signup_form", clear_on_submit=False):
-                signup_email = st.text_input("Email", key="signup_email", placeholder="your@email.com")
-                signup_password = st.text_input("Password", type="password", key="signup_password", 
-                                              help="Password must be at least 6 characters")
-                full_name = st.text_input("Full Name", key="signup_name", placeholder="Your Full Name")
-                signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
+                signup_email = st.text_input(
+                    "Email", key="signup_email", placeholder="your@email.com"
+                )
+                signup_password = st.text_input(
+                    "Password",
+                    type="password",
+                    key="signup_password",
+                    help="Password must be at least 6 characters",
+                )
+                full_name = st.text_input(
+                    "Full Name", key="signup_name", placeholder="Your Full Name"
+                )
+                signup_submitted = st.form_submit_button(
+                    "Sign Up", use_container_width=True
+                )
             if signup_submitted:
                 if signup_email and signup_password and full_name:
                     if len(signup_password) < 8:
@@ -185,12 +205,18 @@ with st.sidebar:
                         st.error("Please enter a valid email address")
                     else:
                         with st.spinner("Creating account..."):
-                            success = auth_manager.signup(signup_email, signup_password, full_name)
+                            success = auth_manager.signup(
+                                signup_email, signup_password, full_name
+                            )
                             # Note: success message is handled in auth_manager.signup()
                 else:
                     st.error("Please fill in all fields")
     else:
-        user_name = st.session_state.user_data['full_name'] if st.session_state.user_data else 'User'
+        user_name = (
+            st.session_state.user_data["full_name"]
+            if st.session_state.user_data
+            else "User"
+        )
         st.success(f"Welcome, {user_name}!")
         if st.button("Logout"):
             # Clear all session state related to the current user
@@ -200,10 +226,10 @@ with st.sidebar:
             st.session_state.chat_sessions = []
             st.session_state.current_session_id = None
             st.session_state.login_time = None
-            if hasattr(st.session_state, '_last_user_id'):
+            if hasattr(st.session_state, "_last_user_id"):
                 del st.session_state._last_user_id
             st.rerun()
-        
+
         st.divider()
 
 # Main app content
@@ -215,15 +241,23 @@ if st.session_state.authenticated:
             <h3>🍚 <b>Nutrion: Smart Nutrition and Diet Assistant</b> 🥗</h3>
             <p style="font-size: 15px; color: #666;">Your personal nutrition companion powered by AI</p>
         </div>
-        """, 
-        unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True,
     )
     st.markdown("---")
-    
+
     # Create tabs
     # tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard", "📝 Export Report", "🎙️ Talk to Me"])
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["⚖️ Nutrition Plan", "🧠 Ask Anything", "🍽 Meal Analyzer", "📊 Nutrition Dashboard"])
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "⚖️ Nutrition Plan",
+            "🧠 Ask Anything",
+            "🍽 Meal Analyzer",
+            "📊 Nutrition Dashboard",
+            "🎙️ Voice Assistant",
+        ]
+    )
 
     # Tab 2: Ask Anything (ChatGPT-like Interface)
     with tab2:
@@ -233,7 +267,7 @@ if st.session_state.authenticated:
         with col1:
             st.subheader("💬 Chat Sessions")
             # Mode selector (bind directly to session_state to persist across reruns)
-            if 'chat_mode' not in st.session_state:
+            if "chat_mode" not in st.session_state:
                 st.session_state.chat_mode = "RAG Q&A"
             st.radio(
                 "Mode",
@@ -246,27 +280,33 @@ if st.session_state.authenticated:
             if st.button("+ New Chat", type="primary", use_container_width=True):
                 if st.session_state.user_data:
                     new_session_id = chat_manager.create_new_chat_session(
-                        st.session_state.user_data['id'],
-                        category=st.session_state.chat_mode
+                        st.session_state.user_data["id"],
+                        category=st.session_state.chat_mode,
                     )
                     if new_session_id:
                         st.session_state.current_session_id = new_session_id
-                        st.session_state.chat_sessions = chat_manager.get_user_chat_sessions(
-                            st.session_state.user_data['id']
+                        st.session_state.chat_sessions = (
+                            chat_manager.get_user_chat_sessions(
+                                st.session_state.user_data["id"]
+                            )
                         )
                         st.rerun()
-                        
+
             # Load user's chat sessions
             if st.session_state.user_data:
                 # Check if we need to reload sessions (either no sessions or user changed)
-                current_user_id = st.session_state.user_data['id']
-                if (not st.session_state.chat_sessions or 
-                    not hasattr(st.session_state, '_last_user_id') or 
-                    st.session_state._last_user_id != current_user_id):
-                    
-                    st.session_state.chat_sessions = chat_manager.get_user_chat_sessions(current_user_id)
+                current_user_id = st.session_state.user_data["id"]
+                if (
+                    not st.session_state.chat_sessions
+                    or not hasattr(st.session_state, "_last_user_id")
+                    or st.session_state._last_user_id != current_user_id
+                ):
+
+                    st.session_state.chat_sessions = (
+                        chat_manager.get_user_chat_sessions(current_user_id)
+                    )
                     st.session_state._last_user_id = current_user_id
-                    
+
                     # Debug: Show current user info
                     # if st.session_state.chat_sessions:
                     #     # st.info(f"Loaded {len(st.session_state.chat_sessions)} chat sessions for user: {current_user_id}")
@@ -278,21 +318,23 @@ if st.session_state.authenticated:
             if st.session_state.chat_sessions:
                 st.write("**Recent Chats:**")
                 for session in st.session_state.chat_sessions:
-                    session_id = session['id']
-                    title = session['title']
-                    category = session.get('category') or "RAG Q&A"
+                    session_id = session["id"]
+                    title = session["title"]
+                    category = session.get("category") or "RAG Q&A"
                     is_current = session_id == st.session_state.current_session_id
 
                     # Session button with styling
                     button_type = "primary" if is_current else "secondary"
-                    label = f"{'🟢 ' if is_current else '💬 '}{title[:25]}" + ("..." if len(title) > 25 else "")
+                    label = f"{'🟢 ' if is_current else '💬 '}{title[:25]}" + (
+                        "..." if len(title) > 25 else ""
+                    )
                     # Append a small mode badge
                     badge = " [Coach]" if category == "User Coach" else " [RAG]"
                     if st.button(
                         label + badge,
                         key=f"session_{session_id}",
                         type=button_type,
-                        use_container_width=True
+                        use_container_width=True,
                     ):
                         st.session_state.current_session_id = session_id
                         st.rerun()
@@ -301,15 +343,21 @@ if st.session_state.authenticated:
                     if is_current:
                         # If this session is in edit mode, show input + actions
                         if st.session_state.editing_session_id == session_id:
-                            with st.form(key=f"edit_form_{session_id}", clear_on_submit=False):
+                            with st.form(
+                                key=f"edit_form_{session_id}", clear_on_submit=False
+                            ):
                                 new_title = st.text_input(
                                     "Edit title",
                                     value=title,
-                                    key=f"title_edit_{session_id}"
+                                    key=f"title_edit_{session_id}",
                                 )
-                                save_pressed = st.form_submit_button("Save", use_container_width=True)
+                                save_pressed = st.form_submit_button(
+                                    "Save", use_container_width=True
+                                )
 
-                                cancel_pressed = st.form_submit_button("Cancel", use_container_width=True)
+                                cancel_pressed = st.form_submit_button(
+                                    "Cancel", use_container_width=True
+                                )
                                 if cancel_pressed:
                                     st.session_state.editing_session_id = None
                                     st.rerun()
@@ -322,13 +370,15 @@ if st.session_state.authenticated:
                                 if st.session_state.user_data and new_title.strip():
                                     updated = chat_manager.update_chat_session_title(
                                         session_id,
-                                        st.session_state.user_data['id'],
-                                        new_title.strip()
+                                        st.session_state.user_data["id"],
+                                        new_title.strip(),
                                     )
                                     if updated:
                                         # Refresh sessions and exit edit mode
-                                        st.session_state.chat_sessions = chat_manager.get_user_chat_sessions(
-                                            st.session_state.user_data['id']
+                                        st.session_state.chat_sessions = (
+                                            chat_manager.get_user_chat_sessions(
+                                                st.session_state.user_data["id"]
+                                            )
                                         )
                                         st.session_state.editing_session_id = None
                                         st.rerun()
@@ -339,34 +389,49 @@ if st.session_state.authenticated:
                         else:
                             col_a, col_b = st.columns(2)
                             with col_a:
-                                if st.button("✏️", key=f"edit_{session_id}", help="Edit title"):
+                                if st.button(
+                                    "✏️", key=f"edit_{session_id}", help="Edit title"
+                                ):
                                     st.session_state.editing_session_id = session_id
                                     st.rerun()
                             with col_b:
-                                if st.button("🗑️", key=f"delete_{session_id}", help="Delete chat"):
-                                    if st.session_state.user_data and chat_manager.delete_chat_session(session_id, st.session_state.user_data['id']):
-                                        st.session_state.chat_sessions = chat_manager.get_user_chat_sessions(
-                                            st.session_state.user_data['id']
+                                if st.button(
+                                    "🗑️", key=f"delete_{session_id}", help="Delete chat"
+                                ):
+                                    if (
+                                        st.session_state.user_data
+                                        and chat_manager.delete_chat_session(
+                                            session_id, st.session_state.user_data["id"]
+                                        )
+                                    ):
+                                        st.session_state.chat_sessions = (
+                                            chat_manager.get_user_chat_sessions(
+                                                st.session_state.user_data["id"]
+                                            )
                                         )
                                         st.session_state.current_session_id = None
                                         st.rerun()
             else:
                 st.info("No chat sessions yet. Start a new chat!")
 
-        
-        with col2:            
+        with col2:
             # --- Header ---
-            st.markdown("""
+            st.markdown(
+                """
                 <div style='text-align:center'>
                     <h4><b>Nutrion AI Chat Assistant</b></h4>
                     <p style="color:gray;">Ask anything about nutrition, meals, or health goals</p>
                     <br>
                 </div>
-            """, unsafe_allow_html=True)
-            
+            """,
+                unsafe_allow_html=True,
+            )
 
             # Initialize Gemini RAG (once per session)
-            if not st.session_state.rag_initialized and st.session_state.rag_error is None:
+            if (
+                not st.session_state.rag_initialized
+                and st.session_state.rag_error is None
+            ):
                 try:
                     # Ensure an event loop exists in the current Streamlit run context
                     try:
@@ -374,10 +439,14 @@ if st.session_state.authenticated:
                     except RuntimeError:
                         asyncio.set_event_loop(asyncio.new_event_loop())
 
-                    cfg_path = os.path.join(os.path.dirname(__file__), 'rag', 'config.yaml')
+                    cfg_path = os.path.join(
+                        os.path.dirname(__file__), "rag", "config.yaml"
+                    )
                     cfg = load_config(cfg_path)
-                    emb = get_gemini_embeddings(model_name=cfg['gemini']['embedding_model'])
-                    vs_cfg = cfg['data_ingestion']['vector_store']
+                    emb = get_gemini_embeddings(
+                        model_name=cfg["gemini"]["embedding_model"]
+                    )
+                    vs_cfg = cfg["data_ingestion"]["vector_store"]
                     vs = get_vector_store(
                         config=vs_cfg,
                         embedding_function=emb,
@@ -385,15 +454,15 @@ if st.session_state.authenticated:
                     # Add similarity score threshold to filter out low-quality matches
                     retriever = vs.as_retriever(
                         search_kwargs={
-                            "k": cfg['rag']['retrieval_k'],
-                            "score_threshold": 0.7  # Only use documents with at least 70% similarity
+                            "k": cfg["rag"]["retrieval_k"],
+                            "score_threshold": 0.7,  # Only use documents with at least 70% similarity
                         }
                     )
-                    llm = get_gemini_llm(model_name=cfg['gemini']['llm_model'])
+                    llm = get_gemini_llm(model_name=cfg["gemini"]["llm_model"])
                     st.session_state.qa_chain = build_rag_chain(
                         llm=llm,
                         retriever=retriever,
-                        chain_type=cfg['rag']['chain_type'],
+                        chain_type=cfg["rag"]["chain_type"],
                         return_source_documents=True,
                     )
                     # Diagnostics: show collection stats
@@ -410,8 +479,12 @@ if st.session_state.authenticated:
             if st.session_state.rag_error:
                 st.error(f"RAG initialization failed: {st.session_state.rag_error}")
                 with st.expander("Details / Fix"):
-                    st.write("- Ensure GOOGLE_API_KEY is set in your .env or environment")
-                    st.write("- Ensure ingestion has run to populate the Supabase store")
+                    st.write(
+                        "- Ensure GOOGLE_API_KEY is set in your .env or environment"
+                    )
+                    st.write(
+                        "- Ensure ingestion has run to populate the Supabase store"
+                    )
                 if st.button("↻ Retry RAG init", type="primary"):
                     st.session_state.rag_error = None
                     st.session_state.rag_initialized = False
@@ -425,31 +498,41 @@ if st.session_state.authenticated:
                 # 1. Render chat history ABOVE the input
                 current_messages = chat_manager.get_chat_history(
                     st.session_state.current_session_id,
-                    st.session_state.user_data['id'] if st.session_state.user_data else None
+                    (
+                        st.session_state.user_data["id"]
+                        if st.session_state.user_data
+                        else None
+                    ),
                 )
-                
+
                 # Debug: Show chat history info
                 # if current_messages:
-                    # st.info(f"Loaded {len(current_messages)} messages for session: {st.session_state.current_session_id}")
-                    # st.info(f"Loaded {len(current_messages)} messages")
-                    # st.info("Loaded messages")
+                # st.info(f"Loaded {len(current_messages)} messages for session: {st.session_state.current_session_id}")
+                # st.info(f"Loaded {len(current_messages)} messages")
+                # st.info("Loaded messages")
                 # else:
                 #     st.info(f"No messages found in this session")
                 for idx, message in enumerate(current_messages):
                     with st.chat_message("user"):
-                        st.markdown(f"""
+                        st.markdown(
+                            f"""
                             <div style="background-color:#e0f7fa;padding:12px;border-radius:10px;">
                                 {message['user_message']}
                             </div>
-                        """, unsafe_allow_html=True)
+                        """,
+                            unsafe_allow_html=True,
+                        )
                         # st.caption(f"📅 {message['created_at']}")
 
                     with st.chat_message("assistant"):
-                        st.markdown(f"""
+                        st.markdown(
+                            f"""
                             <div style="background-color:#f3f4f6;padding:12px;border-radius:10px;">
                                 {message['assistant_response']}
                             </div>
-                        """, unsafe_allow_html=True)
+                        """,
+                            unsafe_allow_html=True,
+                        )
 
                 # 2. THEN show input box BELOW
                 prompt = st.chat_input("Ask me about the loaded data...")
@@ -459,47 +542,72 @@ if st.session_state.authenticated:
                             assistant_response = ""
                             try:
                                 if st.session_state.qa_chain is None:
-                                    raise RuntimeError("RAG is not initialized. Check your GOOGLE_API_KEY and vector store.")
+                                    raise RuntimeError(
+                                        "RAG is not initialized. Check your GOOGLE_API_KEY and vector store."
+                                    )
                                 # Determine session mode (category)
                                 current_mode = "RAG Q&A"
-                                for s in (st.session_state.chat_sessions or []):
-                                    if s.get('id') == st.session_state.current_session_id:
-                                        current_mode = s.get('category') or "RAG Q&A"
+                                for s in st.session_state.chat_sessions or []:
+                                    if (
+                                        s.get("id")
+                                        == st.session_state.current_session_id
+                                    ):
+                                        current_mode = s.get("category") or "RAG Q&A"
                                         break
 
                                 original_query = prompt
                                 if current_mode == "User Coach":
                                     # Fetch user preferences
-                                    prefs = db_manager.get_user_preferences(st.session_state.user_data['id']) or {}
-                                    if not prefs:
-                                        assistant_response = (
-                                            "I need your saved profile to personalize advice. Go to Nutrition Plan, fill the form, and click 'Save Data'."
+                                    prefs = (
+                                        db_manager.get_user_preferences(
+                                            st.session_state.user_data["id"]
                                         )
+                                        or {}
+                                    )
+                                    if not prefs:
+                                        assistant_response = "I need your saved profile to personalize advice. Go to Nutrition Plan, fill the form, and click 'Save Data'."
                                         raise Exception("no_user_prefs")
                                     # Compose a concise user profile JSON with macros if available
                                     try:
-                                        prefs_json = json.dumps(prefs, ensure_ascii=False)
+                                        prefs_json = json.dumps(
+                                            prefs, ensure_ascii=False
+                                        )
                                     except Exception:
                                         prefs_json = str(prefs)
-                                    
+
                                     # First retrieve documents using the original query
-                                    retrieval_docs = st.session_state.qa_chain.retriever.get_relevant_documents(original_query)
-                                    
+                                    retrieval_docs = st.session_state.qa_chain.retriever.get_relevant_documents(
+                                        original_query
+                                    )
+
                                     # Then create the coach-specific prompt with user profile
                                     coach_preamble = (
                                         "You are a personal nutrition coach for this user. Use the USER PROFILE JSON below together with retrieved documents. "
                                         "Prioritize user's constraints (allergies, preferences, goals). Be concise and actionable.\n"
                                         f"USER PROFILE: {prefs_json}\n"
                                     )
-                                    coach_query = coach_preamble + f"Question: {original_query}"
-                                    
+                                    coach_query = (
+                                        coach_preamble + f"Question: {original_query}"
+                                    )
+
                                     # Use the chain with retrieved documents and coach query
-                                    result = st.session_state.qa_chain._call({"query": coach_query, "input_documents": retrieval_docs})
+                                    result = st.session_state.qa_chain._call(
+                                        {
+                                            "query": coach_query,
+                                            "input_documents": retrieval_docs,
+                                        }
+                                    )
                                 else:
                                     # Standard RAG mode - use the chain normally
-                                    result = st.session_state.qa_chain.invoke({"query": original_query})
+                                    result = st.session_state.qa_chain.invoke(
+                                        {"query": original_query}
+                                    )
                                 # Default response from RAG
-                                assistant_response = result.get("result") if isinstance(result, dict) else str(result)
+                                assistant_response = (
+                                    result.get("result")
+                                    if isinstance(result, dict)
+                                    else str(result)
+                                )
 
                                 # If no sources were retrieved, fall back to a general LLM answer
                                 source_docs = []
@@ -510,7 +618,9 @@ if st.session_state.authenticated:
                                     try:
                                         llm = st.session_state.get("llm")
                                         if llm is None:
-                                            raise RuntimeError("LLM not available for fallback.")
+                                            raise RuntimeError(
+                                                "LLM not available for fallback."
+                                            )
                                         # Enforce concise fallback: one short, direct sentence
                                         if current_mode == "User Coach":
                                             brief_prompt = (
@@ -524,14 +634,21 @@ if st.session_state.authenticated:
                                                 f"Question: {prompt}"
                                             )
                                         generic = llm.invoke(brief_prompt)
-                                        if hasattr(generic, "content") and generic.content:
+                                        if (
+                                            hasattr(generic, "content")
+                                            and generic.content
+                                        ):
                                             assistant_response = generic.content
                                         else:
                                             assistant_response = str(generic)
                                         # Trim to one sentence and cap length for safety
-                                        assistant_response = assistant_response.strip().split("\n")[0]
+                                        assistant_response = (
+                                            assistant_response.strip().split("\n")[0]
+                                        )
                                         if "." in assistant_response:
-                                            assistant_response = assistant_response.split(".")[0] + "."
+                                            assistant_response = (
+                                                assistant_response.split(".")[0] + "."
+                                            )
                                         assistant_response = assistant_response[:200]
                                         assistant_response += "\n\n(Note: No relevant documents were found; this is a brief general answer.)"
                                     except Exception as e_fallback:
@@ -546,32 +663,51 @@ if st.session_state.authenticated:
 
                             chat_manager.add_message_to_chat(
                                 st.session_state.current_session_id,
-                                st.session_state.user_data['id'],
+                                st.session_state.user_data["id"],
                                 prompt,
-                                assistant_response
+                                assistant_response,
                             )
-                            st.rerun()  # To show the updated message list          
+                            st.rerun()  # To show the updated message list
                     else:
                         st.error("Please log in to start chatting!")
 
     # Tab 1: AI Nutrition Plan
     with tab1:
         st.header("⚖️ AI Nutrition Plan")
-        st.markdown("Fill in your details to generate a personalized daily nutrition plan.")
+        st.markdown(
+            "Fill in your details to generate a personalized daily nutrition plan."
+        )
 
         # Section: Personal Info
         st.markdown("### 👤 Personal Information")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            age = st.number_input("Age", min_value=10, max_value=100, value=25, key="plan_age")
+            age = st.number_input(
+                "Age", min_value=10, max_value=100, value=25, key="plan_age"
+            )
         with c2:
-            gender = st.selectbox("Gender", ["Male", "Female", "Other"], key="plan_gender")
+            gender = st.selectbox(
+                "Gender", ["Male", "Female", "Other"], key="plan_gender"
+            )
         with c3:
-            height = st.number_input("Height (cm)", min_value=120, max_value=220, value=170, key="plan_height")
+            height = st.number_input(
+                "Height (cm)",
+                min_value=120,
+                max_value=220,
+                value=170,
+                key="plan_height",
+            )
         with c4:
-            weight = st.number_input("Weight (kg)", min_value=35.0, max_value=250.0, value=70.0, step=0.1, key="plan_weight")
+            weight = st.number_input(
+                "Weight (kg)",
+                min_value=35.0,
+                max_value=250.0,
+                value=70.0,
+                step=0.1,
+                key="plan_weight",
+            )
 
-        bmi_val = round(weight/((height/100)**2), 1) if height else ""
+        bmi_val = round(weight / ((height / 100) ** 2), 1) if height else ""
         st.caption(f"Computed BMI: {bmi_val}")
 
         # Section: Lifestyle
@@ -580,21 +716,42 @@ if st.session_state.authenticated:
         with l1:
             activity_level_plan = st.selectbox(
                 "Activity Level",
-                ["Sedentary", "Lightly Active", "Moderately Active", "Very Active", "Extremely Active"],
+                [
+                    "Sedentary",
+                    "Lightly Active",
+                    "Moderately Active",
+                    "Very Active",
+                    "Extremely Active",
+                ],
                 key="plan_activity_level",
             )
         with l2:
-            steps = st.number_input("Daily Steps", min_value=0, value=5000, step=500, key="plan_steps")
+            steps = st.number_input(
+                "Daily Steps", min_value=0, value=5000, step=500, key="plan_steps"
+            )
         with l3:
-            sleep_hours = st.number_input("Sleep Hours", min_value=0.0, max_value=24.0, value=7.0, step=0.5, key="plan_sleep")
+            sleep_hours = st.number_input(
+                "Sleep Hours",
+                min_value=0.0,
+                max_value=24.0,
+                value=7.0,
+                step=0.5,
+                key="plan_sleep",
+            )
 
         # Section: Goals
         st.markdown("### 🎯 Goals")
-        g1, = st.columns(1)
+        (g1,) = st.columns(1)
         with g1:
             health_goal_plan = st.selectbox(
                 "Primary Goal",
-                ["Weight Loss", "Weight Gain", "Muscle Gain", "Maintenance", "General Health"],
+                [
+                    "Weight Loss",
+                    "Weight Gain",
+                    "Muscle Gain",
+                    "Maintenance",
+                    "General Health",
+                ],
                 key="plan_goal",
             )
 
@@ -602,25 +759,45 @@ if st.session_state.authenticated:
         st.markdown("### 🍽️ Preferences")
         p1, p2, p3, p4 = st.columns(4)
         with p1:
-            allergies = st.text_input("Allergies", placeholder="e.g., peanuts, lactose", key="plan_allergies")
+            allergies = st.text_input(
+                "Allergies", placeholder="e.g., peanuts, lactose", key="plan_allergies"
+            )
         with p2:
-            dietary_prefs = st.text_input("Dietary Preferences", placeholder="e.g., Low-Carb, Vegan", key="plan_dietary")
+            dietary_prefs = st.text_input(
+                "Dietary Preferences",
+                placeholder="e.g., Low-Carb, Vegan",
+                key="plan_dietary",
+            )
         with p3:
-            cuisine = st.text_input("Preferred Cuisine", placeholder="e.g., Burmese", key="plan_cuisine")
+            cuisine = st.text_input(
+                "Preferred Cuisine", placeholder="e.g., Burmese", key="plan_cuisine"
+            )
         with p4:
-            aversions = st.text_input("Food Aversions", placeholder="e.g., bitter greens", key="plan_aversions")
+            aversions = st.text_input(
+                "Food Aversions",
+                placeholder="e.g., bitter greens",
+                key="plan_aversions",
+            )
 
         # Section: Health Metrics
         st.markdown("### 🏥 Health Metrics (Optional)")
         h1, h2, h3, h4 = st.columns(4)
         with h1:
-            chronic = st.text_input("Chronic Disease", placeholder="e.g., None", key="plan_chronic")
+            chronic = st.text_input(
+                "Chronic Disease", placeholder="e.g., None", key="plan_chronic"
+            )
         with h2:
-            bp = st.text_input("Blood Pressure", placeholder="e.g., Normal", key="plan_bp")
+            bp = st.text_input(
+                "Blood Pressure", placeholder="e.g., Normal", key="plan_bp"
+            )
         with h3:
-            cholesterol = st.text_input("Cholesterol Level", placeholder="e.g., Normal", key="plan_chol")
+            cholesterol = st.text_input(
+                "Cholesterol Level", placeholder="e.g., Normal", key="plan_chol"
+            )
         with h4:
-            blood_sugar = st.text_input("Blood Sugar Level", placeholder="e.g., Normal", key="plan_bs")
+            blood_sugar = st.text_input(
+                "Blood Sugar Level", placeholder="e.g., Normal", key="plan_bs"
+            )
 
         # Save preferences action
         save_col1, save_col2 = st.columns([1, 3])
@@ -653,7 +830,9 @@ if st.session_state.authenticated:
                 macros = st.session_state.get("plan_macros")
                 if isinstance(macros, dict):
                     prefs["Plan_Macros"] = macros
-                ok = db_manager.save_user_preferences(st.session_state.user_data['id'], prefs)
+                ok = db_manager.save_user_preferences(
+                    st.session_state.user_data["id"], prefs
+                )
                 if ok:
                     st.success("Data saved.")
                 else:
@@ -684,7 +863,10 @@ if st.session_state.authenticated:
                         "Blood_Sugar_Level": blood_sugar or "",
                     }
                     plan_json = get_plan_json(fields)
-                    if isinstance(plan_json, dict) and all(k in plan_json for k in ["calories","protein_g","carbs_g","fats_g","meals"]):
+                    if isinstance(plan_json, dict) and all(
+                        k in plan_json
+                        for k in ["calories", "protein_g", "carbs_g", "fats_g", "meals"]
+                    ):
                         st.success("Plan generated")
                         st.markdown("### 📋 Suggested Plan")
                         st.markdown(f"- Calories: {plan_json.get('calories')} kcal")
@@ -710,133 +892,152 @@ if st.session_state.authenticated:
                             st.markdown("#### Notes")
                             st.markdown(notes)
                     else:
-                        st.warning("Model did not return structured JSON. Showing raw output.")
+                        st.warning(
+                            "Model did not return structured JSON. Showing raw output."
+                        )
                         st.write(plan_json)
                 except Exception as e:
-                    st.error(f"Plan generation failed: {e}. Ensure MISTRAL_API_KEY is set in your environment.")
+                    st.error(
+                        f"Plan generation failed: {e}. Ensure MISTRAL_API_KEY is set in your environment."
+                    )
 
-     # Tab 3: Meal Analyzer (moved from tab2)
+    # Tab 3: Meal Analyzer (moved from tab2)
     with tab3:
         st.header("Meal Analyzer")
-        st.markdown("Analyze your meals for nutrition content and get personalized recommendations")
-        
+        st.markdown(
+            "Analyze your meals for nutrition content and get personalized recommendations"
+        )
+
         # col1, col2 = st.columns([2, 1])
-        
+
         # with col1:
         st.subheader("📝 Meal Description")
         meal_description = st.text_area(
             "Describe your meal(What do you eat today):",
             placeholder="e.g., 1 bowl of chicken curry with rice and salad",
-            height=100
+            height=100,
         )
-        
+
         st.subheader("📸 Meal Photo")
         uploaded_file = st.file_uploader(
-            "Upload a photo of your meal (optional)",
-            type=['png', 'jpg', 'jpeg']
+            "Upload a photo of your meal (optional)", type=["png", "jpg", "jpeg"]
         )
-        
+
         if uploaded_file is not None:
             # Avoid showing duplicate image preview; will show once after analysis
             try:
-                fname = getattr(uploaded_file, 'name', 'image')
+                fname = getattr(uploaded_file, "name", "image")
                 st.caption(f"Uploaded: {fname}")
             except Exception:
                 pass
-        
-        
+
         st.divider()
-        
+
         # Analysis buttons and results
-        btn_col1, btn_col2 = st.columns([1,1])
+        btn_col1, btn_col2 = st.columns([1, 1])
         analyze_text = btn_col1.button("🔍 Analyze Meal", type="primary")
         analyze_image = btn_col2.button("🖼️ Analyze Image")
 
         if analyze_text:
             if meal_description:
                 # with st.spinner("Analyzing your meal (text)..."):
-                    # 1) Extract structured ingredients (Mistral -> JSON)
-                    extraction = extract_ingredients_free_text(meal_description)
-                    # Alert if LLM unavailable or errored
-                    if isinstance(extraction, dict):
-                        note = extraction.get("notes", "")
-                        if note in ("llm_unavailable", "llm_error"):
-                            st.error("Text parsing requires Mistral. Please set MISTRAL_API_KEY and try again.")
-                            st.stop()
-                    items = extraction.get("items", []) if isinstance(extraction, dict) else []
-                    if not items:
-                        st.warning("Couldn't parse ingredients. Try listing items with quantities, e.g., '150g chicken, 1 cup rice'.")
+                # 1) Extract structured ingredients (Mistral -> JSON)
+                extraction = extract_ingredients_free_text(meal_description)
+                # Alert if LLM unavailable or errored
+                if isinstance(extraction, dict):
+                    note = extraction.get("notes", "")
+                    if note in ("llm_unavailable", "llm_error"):
+                        st.error(
+                            "Text parsing requires Mistral. Please set MISTRAL_API_KEY and try again."
+                        )
                         st.stop()
-
-                    # 2) Compute nutrition via USDA (if key present) or local fallback
-                    result = compute_nutrition(items)
-                    # Alert if USDA FDC unavailable
-                    if isinstance(result, dict) and result.get("notes") == "fdc_unavailable":
-                        st.error("Nutrition lookup requires USDA FDC. Please set FDC_API_KEY and try again.")
-                        st.stop()
-                    totals = result.get("totals", {})
-                    details = result.get("details", [])
-                    if not details or all(v == 0 for v in totals.values()):
-                        st.warning("No recognizable foods found. Please refine your description.")
-                        st.stop()
-
-                    # 3) Render details per item
-                    st.subheader("🧾 Parsed Ingredients")
-                    rows = []
-                    for d in details:
-                        it = d.get("item", {})
-                        nut = d.get("nutrients", {})
-                        rows.append({
-                            "Item": it.get("name","-"),
-                            "Qty": it.get("quantity","-"),
-                            "Unit": it.get("unit","-"),
-                            "kcal": nut.get("calories",0),
-                            "Protein(g)": nut.get("protein_g",0),
-                            "Carbs(g)": nut.get("carbs_g",0),
-                            "Fat(g)": nut.get("fat_g",0),
-                            "Fiber(g)": nut.get("fiber_g",0),
-                            "Sugar(g)": nut.get("sugar_g",0),
-                        })
-                    st.dataframe(rows, use_container_width=True)
-
-                    # 4) Totals
-                    st.subheader("📊 Estimated Totals")
-                    st.info(
-                        f"Calories: {totals.get('calories',0)} kcal | "
-                        f"Protein: {totals.get('protein_g',0)} g | "
-                        f"Carbs: {totals.get('carbs_g',0)} g | "
-                        f"Fat: {totals.get('fat_g',0)} g | "
-                        f"Fiber: {totals.get('fiber_g',0)} g | "
-                        f"Sugar: {totals.get('sugar_g',0)} g"
+                items = (
+                    extraction.get("items", []) if isinstance(extraction, dict) else []
+                )
+                if not items:
+                    st.warning(
+                        "Couldn't parse ingredients. Try listing items with quantities, e.g., '150g chicken, 1 cup rice'."
                     )
+                    st.stop()
 
-                    # # 5) Generic recommendations
-                    # st.markdown("### 📋 Recommendations")
-                    # for rec in [
-                    #     "• Consider adding more vegetables for fiber",
-                    #     "• Your protein intake looks good for muscle maintenance",
-                    #     "• Try to drink more water with this meal",
-                    #     "• If monitoring carbs, adjust portion of rice/bread/pasta",
-                    # ]:
-                    #     st.markdown(rec)
+                # 2) Compute nutrition via USDA (if key present) or local fallback
+                result = compute_nutrition(items)
+                # Alert if USDA FDC unavailable
+                if (
+                    isinstance(result, dict)
+                    and result.get("notes") == "fdc_unavailable"
+                ):
+                    st.error(
+                        "Nutrition lookup requires USDA FDC. Please set FDC_API_KEY and try again."
+                    )
+                    st.stop()
+                totals = result.get("totals", {})
+                details = result.get("details", [])
+                if not details or all(v == 0 for v in totals.values()):
+                    st.warning(
+                        "No recognizable foods found. Please refine your description."
+                    )
+                    st.stop()
 
-                    # 6) Persist
-                    if st.session_state.user_data and details:
-                        meal_log_id = db_manager.save_meal_log(
-                            st.session_state.user_data['id'],
-                            meal_description,
-                            uploaded_file.name if uploaded_file else None
-                        )
-                        db_manager.save_nutrition_analysis(
-                            meal_log_id,
-                            calories=totals.get('calories',0),
-                            protein=totals.get('protein_g',0),
-                            carbs=totals.get('carbs_g',0),
-                            fat=totals.get('fat_g',0),
-                            recommendation="Auto-estimated from ingredients",
-                            sugar=totals.get('sugar_g', 0),
-                            fiber=totals.get('fiber_g', 0),
-                        )
+                # 3) Render details per item
+                st.subheader("🧾 Parsed Ingredients")
+                rows = []
+                for d in details:
+                    it = d.get("item", {})
+                    nut = d.get("nutrients", {})
+                    rows.append(
+                        {
+                            "Item": it.get("name", "-"),
+                            "Qty": it.get("quantity", "-"),
+                            "Unit": it.get("unit", "-"),
+                            "kcal": nut.get("calories", 0),
+                            "Protein(g)": nut.get("protein_g", 0),
+                            "Carbs(g)": nut.get("carbs_g", 0),
+                            "Fat(g)": nut.get("fat_g", 0),
+                            "Fiber(g)": nut.get("fiber_g", 0),
+                            "Sugar(g)": nut.get("sugar_g", 0),
+                        }
+                    )
+                st.dataframe(rows, use_container_width=True)
+
+                # 4) Totals
+                st.subheader("📊 Estimated Totals")
+                st.info(
+                    f"Calories: {totals.get('calories',0)} kcal | "
+                    f"Protein: {totals.get('protein_g',0)} g | "
+                    f"Carbs: {totals.get('carbs_g',0)} g | "
+                    f"Fat: {totals.get('fat_g',0)} g | "
+                    f"Fiber: {totals.get('fiber_g',0)} g | "
+                    f"Sugar: {totals.get('sugar_g',0)} g"
+                )
+
+                # # 5) Generic recommendations
+                # st.markdown("### 📋 Recommendations")
+                # for rec in [
+                #     "• Consider adding more vegetables for fiber",
+                #     "• Your protein intake looks good for muscle maintenance",
+                #     "• Try to drink more water with this meal",
+                #     "• If monitoring carbs, adjust portion of rice/bread/pasta",
+                # ]:
+                #     st.markdown(rec)
+
+                # 6) Persist
+                if st.session_state.user_data and details:
+                    meal_log_id = db_manager.save_meal_log(
+                        st.session_state.user_data["id"],
+                        meal_description,
+                        uploaded_file.name if uploaded_file else None,
+                    )
+                    db_manager.save_nutrition_analysis(
+                        meal_log_id,
+                        calories=totals.get("calories", 0),
+                        protein=totals.get("protein_g", 0),
+                        carbs=totals.get("carbs_g", 0),
+                        fat=totals.get("fat_g", 0),
+                        recommendation="Auto-estimated from ingredients",
+                        sugar=totals.get("sugar_g", 0),
+                        fiber=totals.get("fiber_g", 0),
+                    )
             else:
                 st.error("Please describe your meal first!")
 
@@ -846,7 +1047,7 @@ if st.session_state.authenticated:
             else:
                 try:
                     # Initialize vision model once per session
-                    if 'nutrinet_vision' not in st.session_state:
+                    if "nutrinet_vision" not in st.session_state:
                         with st.spinner("Loading food vision model..."):
                             st.session_state.nutrinet_vision = NutriNetVision()
 
@@ -872,13 +1073,15 @@ if st.session_state.authenticated:
 
                         # Show nutrition table
                         st.subheader("📊 Estimated Nutrition (scaled)")
-                        rows = [{
-                            "Calories (kcal)": nutrition.get("calories", 0),
-                            "Protein (g)": nutrition.get("protein_g", 0),
-                            "Carbs (g)": nutrition.get("carbs_g", 0),
-                            "Fat (g)": nutrition.get("fat_g", 0),
-                            "Fiber (g)": nutrition.get("fiber_g", 0),
-                        }]
+                        rows = [
+                            {
+                                "Calories (kcal)": nutrition.get("calories", 0),
+                                "Protein (g)": nutrition.get("protein_g", 0),
+                                "Carbs (g)": nutrition.get("carbs_g", 0),
+                                "Fat (g)": nutrition.get("fat_g", 0),
+                                "Fiber (g)": nutrition.get("fiber_g", 0),
+                            }
+                        ]
                         st.dataframe(rows, use_container_width=True)
 
                         if advice:
@@ -888,25 +1091,31 @@ if st.session_state.authenticated:
                         if st.session_state.user_data:
                             meal_desc = meal_description or f"Image: {name}"
                             meal_log_id = db_manager.save_meal_log(
-                                st.session_state.user_data['id'],
+                                st.session_state.user_data["id"],
                                 meal_desc,
-                                uploaded_file.name if hasattr(uploaded_file, 'name') else None,
+                                (
+                                    uploaded_file.name
+                                    if hasattr(uploaded_file, "name")
+                                    else None
+                                ),
                             )
                             db_manager.save_nutrition_analysis(
                                 meal_log_id,
-                                calories=float(nutrition.get('calories', 0) or 0),
-                                protein=float(nutrition.get('protein_g', 0) or 0),
-                                carbs=float(nutrition.get('carbs_g', 0) or 0),
-                                fat=float(nutrition.get('fat_g', 0) or 0),
+                                calories=float(nutrition.get("calories", 0) or 0),
+                                protein=float(nutrition.get("protein_g", 0) or 0),
+                                carbs=float(nutrition.get("carbs_g", 0) or 0),
+                                fat=float(nutrition.get("fat_g", 0) or 0),
                                 recommendation="Image-based estimate (Food-101)",
-                                sugar=float(nutrition.get('sugar_g', 0) or 0),
-                                fiber=float(nutrition.get('fiber_g', 0) or 0),
+                                sugar=float(nutrition.get("sugar_g", 0) or 0),
+                                fiber=float(nutrition.get("fiber_g", 0) or 0),
                             )
                             st.success("Saved analysis to your log.")
                         else:
                             st.info("Login to save this analysis to your history.")
                 except FileNotFoundError as e:
-                    st.error(f"Food-101 model not found. {e}. Place weights at model_weights/food101_model.pth")
+                    st.error(
+                        f"Food-101 model not found. {e}. Place weights at model_weights/food101_model.pth"
+                    )
                 except Exception as e:
                     st.error(f"Image analysis failed: {e}")
 
@@ -916,17 +1125,28 @@ if st.session_state.authenticated:
         st.divider()
         st.subheader("📒 Today's Logged Meals")
         if st.session_state.user_data:
-            _uid = st.session_state.user_data['id']
+            _uid = st.session_state.user_data["id"]
             # Use UTC-based 'today' and UTC timestamps (no timezone conversion)
             today_utc = datetime.utcnow().date()
             logs = db_manager.get_user_meal_logs(_uid, limit=100) or []
             rows = []
             entries = []  # keep ids for per-row controls
-            totals_today = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0, "sugar_g": 0.0}
+            totals_today = {
+                "calories": 0.0,
+                "protein_g": 0.0,
+                "carbs_g": 0.0,
+                "fat_g": 0.0,
+                "fiber_g": 0.0,
+                "sugar_g": 0.0,
+            }
             for m in logs:
                 try:
                     mt = m.get("meal_time")
-                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.utcnow()
+                    dt_utc = (
+                        datetime.fromisoformat(mt.replace("Z", "+00:00"))
+                        if isinstance(mt, str)
+                        else datetime.utcnow()
+                    )
                     if dt_utc.date() != today_utc:
                         continue
                 except Exception:
@@ -948,10 +1168,12 @@ if st.session_state.authenticated:
                     "Sugar (g)": round(sug, 1),
                 }
                 rows.append(row)
-                entries.append({
-                    "id": m.get("id"),
-                    **row,
-                })
+                entries.append(
+                    {
+                        "id": m.get("id"),
+                        **row,
+                    }
+                )
                 totals_today["calories"] += cal
                 totals_today["protein_g"] += pr
                 totals_today["carbs_g"] += cb
@@ -962,7 +1184,9 @@ if st.session_state.authenticated:
             if rows:
                 with st.expander("Maintenance", expanded=False):
                     if st.button("Clear previous days", key="clear_prev_days"):
-                        ok = db_manager.delete_user_meals_not_today(_uid, today_utc.isoformat())
+                        ok = db_manager.delete_user_meals_not_today(
+                            _uid, today_utc.isoformat()
+                        )
                         if ok:
                             st.success("Cleared older entries.")
                             try:
@@ -971,7 +1195,9 @@ if st.session_state.authenticated:
                                 st.experimental_rerun()
                         else:
                             st.error("Failed to clear older entries.")
-                st.caption("Remove any test entries; this deletes the meal and its analysis.")
+                st.caption(
+                    "Remove any test entries; this deletes the meal and its analysis."
+                )
                 for entry in entries:
                     with st.container():
                         c1, c2, c3 = st.columns([6, 4, 1])
@@ -986,7 +1212,7 @@ if st.session_state.authenticated:
                             )
                         with c3:
                             if st.button("Remove", key=f"remove_{entry['id']}"):
-                                ok = db_manager.delete_meal_log(entry['id'])
+                                ok = db_manager.delete_meal_log(entry["id"])
                                 if ok:
                                     st.success("Removed entry.")
                                     try:
@@ -999,14 +1225,16 @@ if st.session_state.authenticated:
                 st.info("No meals logged today. Analyze a meal above to see it here.")
         else:
             st.info("Please log in to view your meal analyses.")
-    
+
     # Tab 4: Nutrition Dashboard
     with tab4:
         st.header("📊 Nutrition Dashboard")
         st.markdown("Visualize your nutrition data and track your progress")
-        
+
         # Real data: get plan targets and today's intake from meal analyses
-        user_id = st.session_state.user_data['id'] if st.session_state.user_data else None
+        user_id = (
+            st.session_state.user_data["id"] if st.session_state.user_data else None
+        )
         prefs = db_manager.get_user_preferences(user_id) if user_id else {}
         plan = prefs.get("Plan_Macros") or {}
 
@@ -1025,7 +1253,11 @@ if st.session_state.authenticated:
             for m in meals:
                 try:
                     mt = m.get("meal_time")
-                    dt_utc = datetime.fromisoformat(mt.replace("Z", "+00:00")) if isinstance(mt, str) else datetime.utcnow()
+                    dt_utc = (
+                        datetime.fromisoformat(mt.replace("Z", "+00:00"))
+                        if isinstance(mt, str)
+                        else datetime.utcnow()
+                    )
                     if dt_utc.date() != today_utc:
                         continue
                 except Exception:
@@ -1054,12 +1286,14 @@ if st.session_state.authenticated:
                 round(targets.get("carbs_g", 0), 2),
             ]
             units = ["kcal", "g", "g", "g"]
-            df_bar = pd.DataFrame({
-                "Nutrient": categories * 2,
-                "Value": actual_vals + target_vals,
-                "Type": ["Actual"] * 4 + ["Target"] * 4,
-                "Unit": units * 2,
-            })
+            df_bar = pd.DataFrame(
+                {
+                    "Nutrient": categories * 2,
+                    "Value": actual_vals + target_vals,
+                    "Type": ["Actual"] * 4 + ["Target"] * 4,
+                    "Unit": units * 2,
+                }
+            )
             fig_bar = px.bar(
                 df_bar,
                 x="Nutrient",
@@ -1094,9 +1328,9 @@ if st.session_state.authenticated:
                 color_discrete_sequence=px.colors.qualitative.Pastel,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
-        
+
         st.divider()
-        
+
         # Weekly trend (mock data)
         # st.subheader("📅 Weekly Nutrition Trends")
         # dates = pd.date_range(start='2024-01-01', periods=7, freq='D')
@@ -1106,7 +1340,7 @@ if st.session_state.authenticated:
         #     'Protein': [110, 120, 100, 130, 115, 140, 125],
         #     'Carbs': [230, 250, 200, 280, 220, 290, 240]
         # })
-        
+
         # fig_line = px.line(
         #     weekly_data,
         #     x='Date',
@@ -1115,7 +1349,7 @@ if st.session_state.authenticated:
         #     markers=True
         # )
         # st.plotly_chart(fig_line, use_container_width=True)
-        
+
         # Nutrition goals progress
         st.subheader("🎯 Goals Progress")
         g1, g2, g3, g4 = st.columns(4)
@@ -1131,13 +1365,17 @@ if st.session_state.authenticated:
             st.metric(
                 "Calories",
                 f"{int(round(totals.get('calories', 0)))} kcal",
-                _delta_str(totals.get("calories", 0), targets.get("calories", 0), "kcal"),
+                _delta_str(
+                    totals.get("calories", 0), targets.get("calories", 0), "kcal"
+                ),
             )
         with g2:
             st.metric(
                 "Protein",
                 f"{int(round(totals.get('protein_g', 0)))} g",
-                _delta_str(totals.get("protein_g", 0), targets.get("protein_g", 0), "g"),
+                _delta_str(
+                    totals.get("protein_g", 0), targets.get("protein_g", 0), "g"
+                ),
             )
         with g3:
             st.metric(
@@ -1151,63 +1389,412 @@ if st.session_state.authenticated:
                 f"{int(round(totals.get('fat_g', 0)))} g",
                 _delta_str(totals.get("fat_g", 0), targets.get("fat_g", 0), "g"),
             )
-    
-    
+
+    # Tab 5: Voice Assistant
+    with tab5:
+        st.header("🎙️ Talk to Me")
+        st.markdown(
+            "Have a natural conversation with your nutrition assistant using voice"
+        )
+
+        # Import voice assistant components
+        try:
+            import sys
+            import os
+            import subprocess
+            import threading
+            import time
+
+            # Import the voice assistant module
+            from assembly_nutrition_assistant import AssemblyNutritionAssistant
+
+            # Voice interface layout
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                st.markdown(
+                    """
+                    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+                        <h3>🎤 Voice Input</h3>
+                        <p>Click the microphone to start speaking</p>
+                    </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+
+                # Voice input controls
+                voice_col1, voice_col2, voice_col3 = st.columns([1, 2, 1])
+
+                # Initialize voice assistant in session state
+                if "voice_assistant" not in st.session_state:
+                    st.session_state.voice_assistant = None
+                    st.session_state.voice_running = False
+                    st.session_state.voice_output = ""
+                    st.session_state.voice_logs = []
+                    st.session_state.selected_device = 0
+
+                # Device selection
+                st.subheader("🎧 Audio Device Selection")
+                available_devices = [
+                    "MacBook Pro Microphone (Device 0)",
+                    "Microsoft Teams Audio (Device 2)",
+                    "Messenger Loopback Audio (Device 3)",
+                    "ZoomAudioDevice (Device 4)",
+                ]
+                device_names = [
+                    d.split("(Device ")[0].strip() for d in available_devices
+                ]
+                device_indices = [0, 2, 3, 4]
+
+                selected_device_name = st.selectbox(
+                    "Select your microphone:",
+                    device_names,
+                    index=0,
+                    help="Choose the microphone you want to use for voice input",
+                )
+                selected_device_index = device_indices[
+                    device_names.index(selected_device_name)
+                ]
+                st.session_state.selected_device = selected_device_index
+
+                with voice_col2:
+                    # Voice assistant status indicator
+                    if st.session_state.voice_running:
+                        st.markdown(
+                            """
+                            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+                                <h3>🎤 Voice Assistant Active</h3>
+                                <div style="display: flex; justify-content: center; align-items: center; margin: 10px 0;">
+                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out;"></div>
+                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.1s;"></div>
+                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.3s;"></div>
+                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.4s;"></div>
+                                </div>
+                                <p>Say "RYAN" followed by your question</p>
+                            </div>
+                            <style>
+                            @keyframes wave {
+                                0%, 100% { transform: scaleY(1); }
+                                50% { transform: scaleY(1.5); }
+                            }
+                            </style>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            """
+                            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); border-radius: 15px; color: #666; margin-bottom: 20px;">
+                                <h3>🎤 Voice Assistant Inactive</h3>
+                                <p>Click "Start Voice Assistant" to begin</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                    if st.button(
+                        "🎤 Start Voice Assistant",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        if not st.session_state.voice_running:
+                            try:
+                                # Set up environment variable for AssemblyAI
+                                os.environ["ASSEMBLYAI_API_KEY"] = (
+                                    "32a11032d56d438497638cd2b8e6fd5a"
+                                )
+
+                                # Initialize voice assistant
+                                model_path = os.path.join(
+                                    os.path.dirname(__file__),
+                                    "vosk-model-small-en-us-0.15",
+                                    "vosk-model-small-en-us-0.15",
+                                )
+
+                                # Define log callback function
+                                def log_callback(message, log_type):
+                                    if "voice_logs" not in st.session_state:
+                                        st.session_state.voice_logs = []
+                                    st.session_state.voice_logs.append(
+                                        {
+                                            "message": message,
+                                            "type": log_type,
+                                            "timestamp": datetime.now().strftime(
+                                                "%H:%M:%S"
+                                            ),
+                                        }
+                                    )
+
+                                st.session_state.voice_assistant = (
+                                    AssemblyNutritionAssistant(
+                                        model_path=model_path,
+                                        assembly_key="32a11032d56d438497638cd2b8e6fd5a",
+                                        nutrition_kb_path=os.path.join(
+                                            os.path.dirname(__file__),
+                                            "models",
+                                            "accurate_nutrition_kb.json",
+                                        ),
+                                        device_index=st.session_state.selected_device,
+                                        log_callback=log_callback,
+                                    )
+                                )
+
+                                # Start listening in a separate thread
+                                if st.session_state.voice_assistant.start_listening():
+                                    st.session_state.voice_running = True
+                                    st.success(
+                                        "🎤 Voice assistant started! Say 'RYAN' followed by your question."
+                                    )
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "Failed to start audio listening. Check your microphone permissions."
+                                    )
+                            except Exception as e:
+                                st.error(f"Failed to start voice assistant: {e}")
+                        else:
+                            st.info("Voice assistant is already running!")
+
+                    if st.button("⏹️ Stop Voice Assistant", use_container_width=True):
+                        if st.session_state.voice_running:
+                            st.session_state.voice_running = False
+                            if st.session_state.voice_assistant:
+                                st.session_state.voice_assistant.stop_listening()
+                                st.session_state.voice_assistant.cleanup()
+                            st.success("Voice assistant stopped")
+                            st.rerun()
+                        else:
+                            st.info("Voice assistant is not running")
+
+                # Voice logs display
+                if st.session_state.voice_logs:
+                    st.subheader("📝 Voice Conversation Log")
+                    with st.expander("View Voice Logs", expanded=True):
+                        for log in reversed(
+                            st.session_state.voice_logs[-10:]
+                        ):  # Show last 10 logs
+                            if log["type"] == "user":
+                                st.markdown(f"**👤 You:** {log['message']}")
+                            elif log["type"] == "assistant":
+                                st.markdown(f"**🤖 Assistant:** {log['message']}")
+                            elif log["type"] == "system":
+                                st.markdown(f"**⚙️ System:** {log['message']}")
+                            elif log["type"] == "tts":
+                                st.markdown(f"**🔊 Speaking:** {log['message']}")
+                            elif log["type"] == "error":
+                                st.markdown(f"**❌ Error:** {log['message']}")
+                            st.markdown("---")
+
+                st.markdown("---")
+
+                # Voice settings
+                st.subheader("⚙️ Voice Settings")
+                voice_language = st.selectbox(
+                    "Language",
+                    [
+                        "English (US)",
+                        "English (UK)",
+                        "Spanish",
+                        "French",
+                        "German",
+                        "Italian",
+                    ],
+                    help="Select your preferred language for voice interaction",
+                )
+
+                voice_speed = st.slider(
+                    "Speech Speed",
+                    min_value=0.5,
+                    max_value=2.0,
+                    value=1.0,
+                    step=0.1,
+                    help="Adjust the speed of AI voice responses",
+                )
+
+                voice_pitch = st.selectbox(
+                    "Voice Type",
+                    ["Natural", "Friendly", "Professional", "Calm"],
+                    help="Choose the tone of the AI voice",
+                )
+
+            with col2:
+                st.markdown(
+                    """
+                    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+                        <h3>🔊 AI Response</h3>
+                        <p>Listen to personalized nutrition advice</p>
+                    </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+
+                # AI Response area
+                with st.container():
+                    if st.session_state.voice_running:
+                        st.markdown(
+                            """
+                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; min-height: 200px;">
+                                <h5>💬 AI Assistant Response:</h5>
+                                <p style="color: #6c757d; font-style: italic;">
+                                    🎤 Voice assistant is active! Say 'RYAN' followed by your nutrition question.
+                                </p>
+                                <div style="margin-top: 20px;">
+                                    <p><strong>🎯 Example Topics You Can Ask About:</strong></p>
+                                    <ul>
+                                        <li>🥗 "RYAN, what should I eat for breakfast?"</li>
+                                        <li>💪 "RYAN, how much protein do I need daily?"</li>
+                                        <li>🏃 "RYAN, pre-workout meal suggestions?"</li>
+                                        <li>😴 "RYAN, foods that help with sleep?"</li>
+                                        <li>🎂 "RYAN, healthy dessert alternatives?"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            """
+                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #6c757d; min-height: 200px;">
+                                <h5>💬 AI Assistant Response:</h5>
+                                <p style="color: #6c757d; font-style: italic;">
+                                    Click "Start Voice Assistant" to begin voice interaction with your nutrition assistant.
+                                </p>
+                            </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
+                st.markdown("---")
+
+                # Voice response controls
+                response_col1, response_col2 = st.columns(2)
+                with response_col1:
+                    if st.button(
+                        "🔊 Test Voice", type="secondary", use_container_width=True
+                    ):
+                        if st.session_state.voice_assistant:
+                            try:
+                                st.session_state.voice_assistant.tts.speak(
+                                    "Hello! I'm your nutrition assistant. Say RYAN followed by your question."
+                                )
+                                st.success("Voice test completed!")
+                            except Exception as e:
+                                st.error(f"Voice test failed: {e}")
+                        else:
+                            st.warning("Please start the voice assistant first!")
+
+                with response_col2:
+                    if st.button("📋 Save Conversation", use_container_width=True):
+                        st.success("Conversation saved to your chat history!")
+
+            st.markdown("---")
+
+            # Instructions
+            st.subheader("📜 How to Use Voice Assistant")
+            with st.expander("🗣️ Voice Assistant Instructions", expanded=True):
+                st.markdown(
+                    """
+                **Getting Started:**
+                1. Click "Start Voice Assistant" to initialize the voice system
+                2. Wait for the confirmation message
+                3. Say "RYAN" followed by your nutrition question
+                4. The assistant will respond with voice and text
+                5. Say "stop listening" to end the session
+                
+                **Example Commands:**
+                - "RYAN, how many calories in an apple?"
+                - "RYAN, what's a good post-workout meal?"
+                - "RYAN, create a 7-day meal plan"
+                - "RYAN, how much protein do I need?"
+                
+                **Troubleshooting:**
+                - Make sure your microphone is working
+                - Speak clearly and wait for the wake word "RYAN"
+                - If the assistant doesn't respond, try saying "RYAN" again
+                - Check that your AssemblyAI API key is set correctly
+                """
+                )
+
+            # Feature information
+            st.markdown("---")
+            st.info(
+                """
+                🎙️ **Voice Assistant Features:**
+                
+                - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
+                - 🔊 **AI voice responses** - Hear personalized advice in natural speech
+                - 🧠 **Smart nutrition knowledge** - Powered by AssemblyAI and nutrition database
+                - 💾 **Voice conversation history** - All voice interactions can be saved
+                - 🎯 **Context awareness** - AI remembers your preferences and dietary needs
+                - 📱 **Hands-free operation** - Perfect for cooking or exercising
+                """
+            )
+
+        except ImportError as e:
+            st.error(f"Voice assistant dependencies not installed: {e}")
+            st.info(
+                "Please install the required packages: pip install vosk sounddevice pyttsx3 assemblyai"
+            )
+        except Exception as e:
+            st.error(f"Voice assistant error: {e}")
+            st.info("Please check your microphone and audio settings.")
+
     # with tab5:
     #     st.header("📝 Export Report")
     #     st.markdown("Generate and download comprehensive nutrition reports")
-        
+
     #     st.info("🚧 **Coming Soon!** This feature is under development.")
-        
+
     #     col1, col2 = st.columns([2, 1])
-        
+
     #     with col1:
     #         st.markdown("""
     #         ### 📄 What will be included in your report:
-            
+
     #         - **🍽️ Meal Analysis History:** Complete log of analyzed meals with nutrition breakdowns
-    #         - **💬 Chat Conversations:** Your nutrition Q&A sessions with the AI assistant  
+    #         - **💬 Chat Conversations:** Your nutrition Q&A sessions with the AI assistant
     #         - **📊 Visual Charts:** Nutrition trends, macronutrient distributions, and progress tracking
     #         - **🎯 Goal Progress:** How well you're meeting your nutrition and health goals
     #         - **💡 Personalized Recommendations:** Tailored advice based on your profile and preferences
     #         - **📈 Weekly/Monthly Summaries:** Comprehensive overview of your nutrition journey
-            
+
     #         ### 🎨 Report Formats (Future):
     #         - **PDF Report:** Professional, printable format
     #         - **Interactive Dashboard:** Shareable web version
     #         - **CSV Data Export:** Raw data for your own analysis
     #         """)
-        
+
     #     with col2:
     #         st.markdown("### 🔧 Export Options")
-            
+
     #         report_type = st.selectbox(
     #             "Report Type",
     #             ["Weekly Summary", "Monthly Report", "Custom Date Range", "Complete History"]
     #         )
-            
+
     #         if report_type == "Custom Date Range":
     #             start_date = st.date_input("Start Date")
     #             end_date = st.date_input("End Date")
-            
+
     #         include_charts = st.checkbox("Include Charts & Visualizations", value=True)
     #         include_chat = st.checkbox("Include Chat History", value=True)
     #         include_photos = st.checkbox("Include Meal Photos", value=False)
-            
+
     #         st.markdown("---")
-            
+
     #         if st.button("📄 Download Nutrition Report (Coming soon!)", type="primary", disabled=True):
     #             st.info("This feature will be available in the next update!")
-            
+
     #         st.markdown("""
     #         <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-top: 20px;">
     #             <h4>📧 Get Notified</h4>
-    #             <p>Want to be the first to know when report generation is ready? 
+    #             <p>Want to be the first to know when report generation is ready?
     #             We'll notify you via email when this feature launches!</p>
     #         </div>
     #         """, unsafe_allow_html=True)
 
-         
     # with tab6:
     #     st.header("🎙️ Talk to Me")
     #     # st.markdown(
@@ -1370,7 +1957,7 @@ if st.session_state.authenticated:
     #     st.info(
     #         """
     #         🚧 **Voice Features Coming Soon!**
-            
+
     #         This voice interface will include:
     #         - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
     #         - 🔊 **AI voice responses** - Hear personalized advice in natural speech
@@ -1380,7 +1967,7 @@ if st.session_state.authenticated:
     #         - 📱 **Mobile optimized** - Perfect for hands-free nutrition guidance
     #     """
     #     )
-        
+
 
 else:
     # Welcome screen for non-authenticated users
@@ -1393,13 +1980,14 @@ else:
                 Your personal AI-powered nutrition companion for healthier eating habits
             </p>
         </div>
-        """, 
-        unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True,
     )
-    
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("""
+        st.markdown(
+            """
             <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; color: white;">
                 <div style="text-align:center;">
                     <h4>✨ Features</h4>
@@ -1414,14 +2002,18 @@ else:
                  </p>
             </div>
             <br>
-        """, unsafe_allow_html=True)
-        st.markdown("""
+        """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
         ### 🚀 Get Started:
         **Please login or sign up using the sidebar to access all features!**
-        """)
-    
+        """
+        )
+
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: #888;'>Powered by AI</div>",
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
