@@ -455,7 +455,7 @@ if st.session_state.authenticated:
                     retriever = vs.as_retriever(
                         search_kwargs={
                             "k": cfg["rag"]["retrieval_k"],
-                            "score_threshold": 0.7,  # Only use documents with at least 70% similarity
+                            "score_threshold": 0.2,  # Only use documents with at least 70% similarity
                         }
                     )
                     llm = get_gemini_llm(model_name=cfg["gemini"]["llm_model"])
