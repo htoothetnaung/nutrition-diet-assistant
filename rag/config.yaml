@@ -2,7 +2,7 @@ app_name: "Gemini RAG for Nutrion"
 
 gemini:
   llm_model: "models/gemini-1.5-flash"
-  embedding_model: "models/text-embedding-004"
+  embedding_model: "models/embedding-001"
 
 data_ingestion:
   document_sources:
