@@ -4,7 +4,7 @@ import os
 
 
 def get_gemini_embeddings(
-    model_name: str = "models/embedding-001", api_key: Optional[str] = None
+    model_name: str = "models/text-embedding-004", api_key: Optional[str] = None
 ):
     """
     Returns a Gemini embeddings model via LangChain.
