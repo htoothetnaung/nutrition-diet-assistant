@@ -864,8 +864,25 @@ if st.session_state.authenticated:
                         name = item.get("name", "unknown_food")
                         conf = float(item.get("confidence", 0.0))
                         portion = float(item.get("portion", 0.0))
-                        nutrition = item.get("nutrition", {}) or {}
                         advice = item.get("health_advice", "")
+
+                        # Enforce FDC-only nutrition path
+                        if not os.getenv("FDC_API_KEY"):
+                            st.error("Image nutrition requires USDA FDC. Please set FDC_API_KEY in your environment and try again.")
+                            st.stop()
+
+                        if not name or name.startswith("class_") or portion <= 0:
+                            st.error("Could not derive a valid food name/portion from the image. Try another image.")
+                            st.stop()
+
+                        # Query FDC by predicted name and portion (grams)
+                        fdc_payload = [{"name": name, "quantity": portion, "unit": "g"}]
+                        fdc_result = compute_nutrition(fdc_payload) or {}
+                        nutrition = fdc_result.get("totals") or {}
+                        fdc_details = fdc_result.get("details") or []
+                        if not fdc_details or not any(v > 0 for v in nutrition.values()):
+                            st.error("USDA FDC did not return nutrition for this prediction. Try another image or different lighting.")
+                            st.stop()
 
                         st.success(f"Prediction: {name} ({conf*100:.1f}% confidence)")
                         st.caption(f"Estimated portion: {int(round(portion))} g")
@@ -898,7 +915,7 @@ if st.session_state.authenticated:
                                 protein=float(nutrition.get('protein_g', 0) or 0),
                                 carbs=float(nutrition.get('carbs_g', 0) or 0),
                                 fat=float(nutrition.get('fat_g', 0) or 0),
-                                recommendation="Image-based estimate (Food-101)",
+                                recommendation="Image-based estimate (FDC only)",
                                 sugar=float(nutrition.get('sugar_g', 0) or 0),
                                 fiber=float(nutrition.get('fiber_g', 0) or 0),
                             )
