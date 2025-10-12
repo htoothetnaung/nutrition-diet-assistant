@@ -60,3 +60,9 @@ torch==2.5.1
 torchvision==0.20.1
 # Optional: broader model backbone support (not required)
 # timm==1.0.9
+
+# Voice Assistant Dependencies
+vosk
+sounddevice
+pyttsx3
+assemblyai
