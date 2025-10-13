@@ -157,7 +157,7 @@ with st.sidebar:
                     "Password", type="password", key="login_password"
                 )
                 login_submitted = st.form_submit_button(
-                    "Login", use_container_width=True
+                    "Login", width='stretch'
                 )
             if login_submitted:
                 if login_email and login_password:
@@ -195,7 +195,7 @@ with st.sidebar:
                     "Full Name", key="signup_name", placeholder="Your Full Name"
                 )
                 signup_submitted = st.form_submit_button(
-                    "Sign Up", use_container_width=True
+                    "Sign Up", width='stretch'
                 )
             if signup_submitted:
                 if signup_email and signup_password and full_name:
@@ -277,7 +277,7 @@ if st.session_state.authenticated:
             )
 
             # New chat button
-            if st.button("+ New Chat", type="primary", use_container_width=True):
+            if st.button("+ New Chat", type="primary", width='stretch'):
                 if st.session_state.user_data:
                     new_session_id = chat_manager.create_new_chat_session(
                         st.session_state.user_data["id"],
@@ -334,7 +334,7 @@ if st.session_state.authenticated:
                         label + badge,
                         key=f"session_{session_id}",
                         type=button_type,
-                        use_container_width=True,
+                        width='stretch',
                     ):
                         st.session_state.current_session_id = session_id
                         st.rerun()
@@ -352,11 +352,11 @@ if st.session_state.authenticated:
                                     key=f"title_edit_{session_id}",
                                 )
                                 save_pressed = st.form_submit_button(
-                                    "Save", use_container_width=True
+                                    "Save", width='stretch'
                                 )
 
                                 cancel_pressed = st.form_submit_button(
-                                    "Cancel", use_container_width=True
+                                    "Cancel", width='stretch'
                                 )
                                 if cancel_pressed:
                                     st.session_state.editing_session_id = None
@@ -802,7 +802,7 @@ if st.session_state.authenticated:
         # Save preferences action
         save_col1, save_col2 = st.columns([1, 3])
         with save_col1:
-            save_prefs = st.button("💾 Save Data", use_container_width=True)
+            save_prefs = st.button("💾 Save Data", width='stretch')
         if save_prefs:
             if not st.session_state.user_data:
                 st.error("Please log in to save preferences.")
@@ -998,7 +998,7 @@ if st.session_state.authenticated:
                             "Sugar(g)": nut.get("sugar_g", 0),
                         }
                     )
-                st.dataframe(rows, use_container_width=True)
+                st.dataframe(rows, width='stretch')
 
                 # 4) Totals
                 st.subheader("📊 Estimated Totals")
@@ -1099,7 +1099,7 @@ if st.session_state.authenticated:
                                 "Fiber (g)": nutrition.get("fiber_g", 0),
                             }
                         ]
-                        st.dataframe(rows, use_container_width=True)
+                        st.dataframe(rows, width='stretch')
 
                         if advice:
                             st.info(f"💡 {advice}")
@@ -1321,7 +1321,7 @@ if st.session_state.authenticated:
                 color_discrete_sequence=px.colors.qualitative.Set2,
                 hover_data={"Unit": True, "Type": True, "Nutrient": True},
             )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, width='stretch')
 
         with col2:
             st.subheader("🥧 Macronutrient Distribution (by calories)")
@@ -1344,7 +1344,7 @@ if st.session_state.authenticated:
                 title="Macronutrient Breakdown (% of calories)",
                 color_discrete_sequence=px.colors.qualitative.Pastel,
             )
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width='stretch')
 
         st.divider()
 
@@ -1513,7 +1513,7 @@ if st.session_state.authenticated:
                     if st.button(
                         "🎤 Start Voice Assistant",
                         type="primary",
-                        use_container_width=True,
+                        width='stretch',
                     ):
                         if not st.session_state.voice_running:
                             try:
@@ -1573,7 +1573,7 @@ if st.session_state.authenticated:
                         else:
                             st.info("Voice assistant is already running!")
 
-                    if st.button("⏹️ Stop Voice Assistant", use_container_width=True):
+                    if st.button("⏹️ Stop Voice Assistant", width='stretch'):
                         if st.session_state.voice_running:
                             st.session_state.voice_running = False
                             if st.session_state.voice_assistant:
@@ -1689,7 +1689,7 @@ if st.session_state.authenticated:
                 response_col1, response_col2 = st.columns(2)
                 with response_col1:
                     if st.button(
-                        "🔊 Test Voice", type="secondary", use_container_width=True
+                        "🔊 Test Voice", type="secondary", width='stretch'
                     ):
                         if st.session_state.voice_assistant:
                             try:
@@ -1703,7 +1703,7 @@ if st.session_state.authenticated:
                             st.warning("Please start the voice assistant first!")
 
                 with response_col2:
-                    if st.button("📋 Save Conversation", use_container_width=True):
+                    if st.button("📋 Save Conversation", width='stretch'):
                         st.success("Conversation saved to your chat history!")
 
             st.markdown("---")
