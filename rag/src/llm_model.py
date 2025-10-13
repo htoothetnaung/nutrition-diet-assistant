@@ -2,7 +2,7 @@ from typing import Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 
-def get_gemini_llm(model_name: str = "gemini-1.5-flash", api_key: Optional[str] = None):
+def get_gemini_llm(model_name: str = "gemini-2.0-flash", api_key: Optional[str] = None):
     key = api_key or os.getenv("GOOGLE_API_KEY")
     if not key:
         raise ValueError("GOOGLE_API_KEY is not set.")

@@ -1,18 +1,27 @@
 app_name: "Gemini RAG for Nutrion"
 
 gemini:
-  llm_model: "gemini-1.5-flash"
+  llm_model: "gemini-2.0-flash"
   embedding_model: "text-embedding-004"
 
 data_ingestion:
   document_sources:
+
+    - type: "website"
+      urls:
+        - "https://www.who.int/health-topics/nutrition"
+        - "https://www.who.int/news-room/fact-sheets/detail/healthy-diet"
+        - "https://www.hsph.harvard.edu/nutritionsource/what-is-protein/"
+        - "https://www.hsph.harvard.edu/nutritionsource/healthy-eating-plate/"
+
     - type: "pdf"
       path: "./data/pdfs/"
-    - type: "markdown"
-      path: "./data/web/"
+    # - type: "markdown"
+    #   path: "./data/web/"
   chunking:
     chunk_size: 1000
     chunk_overlap: 200
+    
   vector_store:
     # type: "chromadb"
     # persist_directory: "./rag/chroma_db"
@@ -23,5 +32,5 @@ data_ingestion:
     supabase_key: ""
 
 rag:
-  retrieval_k: 15
+  retrieval_k: 8
   chain_type: "stuff"
