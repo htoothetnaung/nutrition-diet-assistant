@@ -249,13 +249,13 @@ if st.session_state.authenticated:
     # Create tabs
     # tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🧠 Ask Anything", "⚖️ Nutrition Plan", "🍽 Meal Analyzer", "📊 Nutrition Dashboard", "📝 Export Report", "🎙️ Talk to Me"])
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    tab1, tab2, tab3, tab4= st.tabs(
         [
             "⚖️ Nutrition Plan",
             "🧠 Ask Anything",
             "🍽 Meal Analyzer",
             "📊 Nutrition Dashboard",
-            "🎙️ Voice Assistant",
+            # "🎙️ Voice Assistant",
         ]
     )
 
@@ -1407,356 +1407,356 @@ if st.session_state.authenticated:
                 _delta_str(totals.get("fat_g", 0), targets.get("fat_g", 0), "g"),
             )
 
-    # Tab 5: Voice Assistant
-    with tab5:
-        st.header("🎙️ Talk to Me")
-        st.markdown(
-            "Have a natural conversation with your nutrition assistant using voice"
-        )
+    # # Tab 5: Voice Assistant
+    # with tab5:
+    #     st.header("🎙️ Talk to Me")
+    #     st.markdown(
+    #         "Have a natural conversation with your nutrition assistant using voice"
+    #     )
 
-        # Import voice assistant components
-        try:
-            import sys
-            import os
-            import subprocess
-            import threading
-            import time
+    #     # Import voice assistant components
+    #     try:
+    #         import sys
+    #         import os
+    #         import subprocess
+    #         import threading
+    #         import time
 
-            # Import the voice assistant module
-            from assembly_nutrition_assistant import AssemblyNutritionAssistant
+    #         # Import the voice assistant module
+    #         from assembly_nutrition_assistant import AssemblyNutritionAssistant
 
-            # Voice interface layout
-            col1, col2 = st.columns([1, 1])
+    #         # Voice interface layout
+    #         col1, col2 = st.columns([1, 1])
 
-            with col1:
-                st.markdown(
-                    """
-                    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
-                        <h3>🎤 Voice Input</h3>
-                        <p>Click the microphone to start speaking</p>
-                    </div>
-                """,
-                    unsafe_allow_html=True,
-                )
+    #         with col1:
+    #             st.markdown(
+    #                 """
+    #                 <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+    #                     <h3>🎤 Voice Input</h3>
+    #                     <p>Click the microphone to start speaking</p>
+    #                 </div>
+    #             """,
+    #                 unsafe_allow_html=True,
+    #             )
 
-                # Voice input controls
-                voice_col1, voice_col2, voice_col3 = st.columns([1, 2, 1])
+    #             # Voice input controls
+    #             voice_col1, voice_col2, voice_col3 = st.columns([1, 2, 1])
 
-                # Initialize voice assistant in session state
-                if "voice_assistant" not in st.session_state:
-                    st.session_state.voice_assistant = None
-                    st.session_state.voice_running = False
-                    st.session_state.voice_output = ""
-                    st.session_state.voice_logs = []
-                    st.session_state.selected_device = 0
+    #             # Initialize voice assistant in session state
+    #             if "voice_assistant" not in st.session_state:
+    #                 st.session_state.voice_assistant = None
+    #                 st.session_state.voice_running = False
+    #                 st.session_state.voice_output = ""
+    #                 st.session_state.voice_logs = []
+    #                 st.session_state.selected_device = 0
 
-                # Device selection
-                st.subheader("🎧 Audio Device Selection")
-                available_devices = [
-                    "MacBook Pro Microphone (Device 0)",
-                    "Microsoft Teams Audio (Device 2)",
-                    "Messenger Loopback Audio (Device 3)",
-                    "ZoomAudioDevice (Device 4)",
-                ]
-                device_names = [
-                    d.split("(Device ")[0].strip() for d in available_devices
-                ]
-                device_indices = [0, 2, 3, 4]
+    #             # Device selection
+    #             st.subheader("🎧 Audio Device Selection")
+    #             available_devices = [
+    #                 "MacBook Pro Microphone (Device 0)",
+    #                 "Microsoft Teams Audio (Device 2)",
+    #                 "Messenger Loopback Audio (Device 3)",
+    #                 "ZoomAudioDevice (Device 4)",
+    #             ]
+    #             device_names = [
+    #                 d.split("(Device ")[0].strip() for d in available_devices
+    #             ]
+    #             device_indices = [0, 2, 3, 4]
 
-                selected_device_name = st.selectbox(
-                    "Select your microphone:",
-                    device_names,
-                    index=0,
-                    help="Choose the microphone you want to use for voice input",
-                )
-                selected_device_index = device_indices[
-                    device_names.index(selected_device_name)
-                ]
-                st.session_state.selected_device = selected_device_index
+    #             selected_device_name = st.selectbox(
+    #                 "Select your microphone:",
+    #                 device_names,
+    #                 index=0,
+    #                 help="Choose the microphone you want to use for voice input",
+    #             )
+    #             selected_device_index = device_indices[
+    #                 device_names.index(selected_device_name)
+    #             ]
+    #             st.session_state.selected_device = selected_device_index
 
-                with voice_col2:
-                    # Voice assistant status indicator
-                    if st.session_state.voice_running:
-                        st.markdown(
-                            """
-                            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
-                                <h3>🎤 Voice Assistant Active</h3>
-                                <div style="display: flex; justify-content: center; align-items: center; margin: 10px 0;">
-                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out;"></div>
-                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.1s;"></div>
-                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.2s;"></div>
-                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.3s;"></div>
-                                    <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.4s;"></div>
-                                </div>
-                                <p>Say "RYAN" followed by your question</p>
-                            </div>
-                            <style>
-                            @keyframes wave {
-                                0%, 100% { transform: scaleY(1); }
-                                50% { transform: scaleY(1.5); }
-                            }
-                            </style>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        st.markdown(
-                            """
-                            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); border-radius: 15px; color: #666; margin-bottom: 20px;">
-                                <h3>🎤 Voice Assistant Inactive</h3>
-                                <p>Click "Start Voice Assistant" to begin</p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+    #             with voice_col2:
+    #                 # Voice assistant status indicator
+    #                 if st.session_state.voice_running:
+    #                     st.markdown(
+    #                         """
+    #                         <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+    #                             <h3>🎤 Voice Assistant Active</h3>
+    #                             <div style="display: flex; justify-content: center; align-items: center; margin: 10px 0;">
+    #                                 <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out;"></div>
+    #                                 <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.1s;"></div>
+    #                                 <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.2s;"></div>
+    #                                 <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.3s;"></div>
+    #                                 <div class="wave" style="display: inline-block; width: 4px; height: 20px; background: white; margin: 0 2px; animation: wave 1s infinite ease-in-out; animation-delay: 0.4s;"></div>
+    #                             </div>
+    #                             <p>Say "RYAN" followed by your question</p>
+    #                         </div>
+    #                         <style>
+    #                         @keyframes wave {
+    #                             0%, 100% { transform: scaleY(1); }
+    #                             50% { transform: scaleY(1.5); }
+    #                         }
+    #                         </style>
+    #                         """,
+    #                         unsafe_allow_html=True,
+    #                     )
+    #                 else:
+    #                     st.markdown(
+    #                         """
+    #                         <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); border-radius: 15px; color: #666; margin-bottom: 20px;">
+    #                             <h3>🎤 Voice Assistant Inactive</h3>
+    #                             <p>Click "Start Voice Assistant" to begin</p>
+    #                         </div>
+    #                         """,
+    #                         unsafe_allow_html=True,
+    #                     )
 
-                    if st.button(
-                        "🎤 Start Voice Assistant",
-                        type="primary",
-                        width='stretch',
-                    ):
-                        if not st.session_state.voice_running:
-                            try:
-                                # Set up environment variable for AssemblyAI
-                                os.environ["ASSEMBLYAI_API_KEY"] = (
-                                    "32a11032d56d438497638cd2b8e6fd5a"
-                                )
+    #                 if st.button(
+    #                     "🎤 Start Voice Assistant",
+    #                     type="primary",
+    #                     width='stretch',
+    #                 ):
+    #                     if not st.session_state.voice_running:
+    #                         try:
+    #                             # Set up environment variable for AssemblyAI
+    #                             os.environ["ASSEMBLYAI_API_KEY"] = (
+    #                                 "32a11032d56d438497638cd2b8e6fd5a"
+    #                             )
 
-                                # Initialize voice assistant
-                                model_path = os.path.join(
-                                    os.path.dirname(__file__),
-                                    "vosk-model-small-en-us-0.15",
-                                    "vosk-model-small-en-us-0.15",
-                                )
+    #                             # Initialize voice assistant
+    #                             model_path = os.path.join(
+    #                                 os.path.dirname(__file__),
+    #                                 "vosk-model-small-en-us-0.15",
+    #                                 "vosk-model-small-en-us-0.15",
+    #                             )
 
-                                # Define log callback function
-                                def log_callback(message, log_type):
-                                    if "voice_logs" not in st.session_state:
-                                        st.session_state.voice_logs = []
-                                    st.session_state.voice_logs.append(
-                                        {
-                                            "message": message,
-                                            "type": log_type,
-                                            "timestamp": datetime.now().strftime(
-                                                "%H:%M:%S"
-                                            ),
-                                        }
-                                    )
+    #                             # Define log callback function
+    #                             def log_callback(message, log_type):
+    #                                 if "voice_logs" not in st.session_state:
+    #                                     st.session_state.voice_logs = []
+    #                                 st.session_state.voice_logs.append(
+    #                                     {
+    #                                         "message": message,
+    #                                         "type": log_type,
+    #                                         "timestamp": datetime.now().strftime(
+    #                                             "%H:%M:%S"
+    #                                         ),
+    #                                     }
+    #                                 )
 
-                                st.session_state.voice_assistant = (
-                                    AssemblyNutritionAssistant(
-                                        model_path=model_path,
-                                        assembly_key="32a11032d56d438497638cd2b8e6fd5a",
-                                        nutrition_kb_path=os.path.join(
-                                            os.path.dirname(__file__),
-                                            "models",
-                                            "accurate_nutrition_kb.json",
-                                        ),
-                                        device_index=st.session_state.selected_device,
-                                        log_callback=log_callback,
-                                    )
-                                )
+    #                             st.session_state.voice_assistant = (
+    #                                 AssemblyNutritionAssistant(
+    #                                     model_path=model_path,
+    #                                     assembly_key="32a11032d56d438497638cd2b8e6fd5a",
+    #                                     nutrition_kb_path=os.path.join(
+    #                                         os.path.dirname(__file__),
+    #                                         "models",
+    #                                         "accurate_nutrition_kb.json",
+    #                                     ),
+    #                                     device_index=st.session_state.selected_device,
+    #                                     log_callback=log_callback,
+    #                                 )
+    #                             )
 
-                                # Start listening in a separate thread
-                                if st.session_state.voice_assistant.start_listening():
-                                    st.session_state.voice_running = True
-                                    st.success(
-                                        "🎤 Voice assistant started! Say 'RYAN' followed by your question."
-                                    )
-                                    st.rerun()
-                                else:
-                                    st.error(
-                                        "Failed to start audio listening. Check your microphone permissions."
-                                    )
-                            except Exception as e:
-                                st.error(f"Failed to start voice assistant: {e}")
-                        else:
-                            st.info("Voice assistant is already running!")
+    #                             # Start listening in a separate thread
+    #                             if st.session_state.voice_assistant.start_listening():
+    #                                 st.session_state.voice_running = True
+    #                                 st.success(
+    #                                     "🎤 Voice assistant started! Say 'RYAN' followed by your question."
+    #                                 )
+    #                                 st.rerun()
+    #                             else:
+    #                                 st.error(
+    #                                     "Failed to start audio listening. Check your microphone permissions."
+    #                                 )
+    #                         except Exception as e:
+    #                             st.error(f"Failed to start voice assistant: {e}")
+    #                     else:
+    #                         st.info("Voice assistant is already running!")
 
-                    if st.button("⏹️ Stop Voice Assistant", width='stretch'):
-                        if st.session_state.voice_running:
-                            st.session_state.voice_running = False
-                            if st.session_state.voice_assistant:
-                                st.session_state.voice_assistant.stop_listening()
-                                st.session_state.voice_assistant.cleanup()
-                            st.success("Voice assistant stopped")
-                            st.rerun()
-                        else:
-                            st.info("Voice assistant is not running")
+    #                 if st.button("⏹️ Stop Voice Assistant", width='stretch'):
+    #                     if st.session_state.voice_running:
+    #                         st.session_state.voice_running = False
+    #                         if st.session_state.voice_assistant:
+    #                             st.session_state.voice_assistant.stop_listening()
+    #                             st.session_state.voice_assistant.cleanup()
+    #                         st.success("Voice assistant stopped")
+    #                         st.rerun()
+    #                     else:
+    #                         st.info("Voice assistant is not running")
 
-                # Voice logs display
-                if st.session_state.voice_logs:
-                    st.subheader("📝 Voice Conversation Log")
-                    with st.expander("View Voice Logs", expanded=True):
-                        for log in reversed(
-                            st.session_state.voice_logs[-10:]
-                        ):  # Show last 10 logs
-                            if log["type"] == "user":
-                                st.markdown(f"**👤 You:** {log['message']}")
-                            elif log["type"] == "assistant":
-                                st.markdown(f"**🤖 Assistant:** {log['message']}")
-                            elif log["type"] == "system":
-                                st.markdown(f"**⚙️ System:** {log['message']}")
-                            elif log["type"] == "tts":
-                                st.markdown(f"**🔊 Speaking:** {log['message']}")
-                            elif log["type"] == "error":
-                                st.markdown(f"**❌ Error:** {log['message']}")
-                            st.markdown("---")
+    #             # Voice logs display
+    #             if st.session_state.voice_logs:
+    #                 st.subheader("📝 Voice Conversation Log")
+    #                 with st.expander("View Voice Logs", expanded=True):
+    #                     for log in reversed(
+    #                         st.session_state.voice_logs[-10:]
+    #                     ):  # Show last 10 logs
+    #                         if log["type"] == "user":
+    #                             st.markdown(f"**👤 You:** {log['message']}")
+    #                         elif log["type"] == "assistant":
+    #                             st.markdown(f"**🤖 Assistant:** {log['message']}")
+    #                         elif log["type"] == "system":
+    #                             st.markdown(f"**⚙️ System:** {log['message']}")
+    #                         elif log["type"] == "tts":
+    #                             st.markdown(f"**🔊 Speaking:** {log['message']}")
+    #                         elif log["type"] == "error":
+    #                             st.markdown(f"**❌ Error:** {log['message']}")
+    #                         st.markdown("---")
 
-                st.markdown("---")
+    #             st.markdown("---")
 
-                # Voice settings
-                st.subheader("⚙️ Voice Settings")
-                voice_language = st.selectbox(
-                    "Language",
-                    [
-                        "English (US)",
-                        "English (UK)",
-                        "Spanish",
-                        "French",
-                        "German",
-                        "Italian",
-                    ],
-                    help="Select your preferred language for voice interaction",
-                )
+    #             # Voice settings
+    #             st.subheader("⚙️ Voice Settings")
+    #             voice_language = st.selectbox(
+    #                 "Language",
+    #                 [
+    #                     "English (US)",
+    #                     "English (UK)",
+    #                     "Spanish",
+    #                     "French",
+    #                     "German",
+    #                     "Italian",
+    #                 ],
+    #                 help="Select your preferred language for voice interaction",
+    #             )
 
-                voice_speed = st.slider(
-                    "Speech Speed",
-                    min_value=0.5,
-                    max_value=2.0,
-                    value=1.0,
-                    step=0.1,
-                    help="Adjust the speed of AI voice responses",
-                )
+    #             voice_speed = st.slider(
+    #                 "Speech Speed",
+    #                 min_value=0.5,
+    #                 max_value=2.0,
+    #                 value=1.0,
+    #                 step=0.1,
+    #                 help="Adjust the speed of AI voice responses",
+    #             )
 
-                voice_pitch = st.selectbox(
-                    "Voice Type",
-                    ["Natural", "Friendly", "Professional", "Calm"],
-                    help="Choose the tone of the AI voice",
-                )
+    #             voice_pitch = st.selectbox(
+    #                 "Voice Type",
+    #                 ["Natural", "Friendly", "Professional", "Calm"],
+    #                 help="Choose the tone of the AI voice",
+    #             )
 
-            with col2:
-                st.markdown(
-                    """
-                    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
-                        <h3>🔊 AI Response</h3>
-                        <p>Listen to personalized nutrition advice</p>
-                    </div>
-                """,
-                    unsafe_allow_html=True,
-                )
+    #         with col2:
+    #             st.markdown(
+    #                 """
+    #                 <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 15px; color: white; margin-bottom: 20px;">
+    #                     <h3>🔊 AI Response</h3>
+    #                     <p>Listen to personalized nutrition advice</p>
+    #                 </div>
+    #             """,
+    #                 unsafe_allow_html=True,
+    #             )
 
-                # AI Response area
-                with st.container():
-                    if st.session_state.voice_running:
-                        st.markdown(
-                            """
-                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; min-height: 200px;">
-                                <h5>💬 AI Assistant Response:</h5>
-                                <p style="color: #6c757d; font-style: italic;">
-                                    🎤 Voice assistant is active! Say 'RYAN' followed by your nutrition question.
-                                </p>
-                                <div style="margin-top: 20px;">
-                                    <p><strong>🎯 Example Topics You Can Ask About:</strong></p>
-                                    <ul>
-                                        <li>🥗 "RYAN, what should I eat for breakfast?"</li>
-                                        <li>💪 "RYAN, how much protein do I need daily?"</li>
-                                        <li>🏃 "RYAN, pre-workout meal suggestions?"</li>
-                                        <li>😴 "RYAN, foods that help with sleep?"</li>
-                                        <li>🎂 "RYAN, healthy dessert alternatives?"</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        """,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        st.markdown(
-                            """
-                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #6c757d; min-height: 200px;">
-                                <h5>💬 AI Assistant Response:</h5>
-                                <p style="color: #6c757d; font-style: italic;">
-                                    Click "Start Voice Assistant" to begin voice interaction with your nutrition assistant.
-                                </p>
-                            </div>
-                        """,
-                            unsafe_allow_html=True,
-                        )
+    #             # AI Response area
+    #             with st.container():
+    #                 if st.session_state.voice_running:
+    #                     st.markdown(
+    #                         """
+    #                         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; min-height: 200px;">
+    #                             <h5>💬 AI Assistant Response:</h5>
+    #                             <p style="color: #6c757d; font-style: italic;">
+    #                                 🎤 Voice assistant is active! Say 'RYAN' followed by your nutrition question.
+    #                             </p>
+    #                             <div style="margin-top: 20px;">
+    #                                 <p><strong>🎯 Example Topics You Can Ask About:</strong></p>
+    #                                 <ul>
+    #                                     <li>🥗 "RYAN, what should I eat for breakfast?"</li>
+    #                                     <li>💪 "RYAN, how much protein do I need daily?"</li>
+    #                                     <li>🏃 "RYAN, pre-workout meal suggestions?"</li>
+    #                                     <li>😴 "RYAN, foods that help with sleep?"</li>
+    #                                     <li>🎂 "RYAN, healthy dessert alternatives?"</li>
+    #                                 </ul>
+    #                             </div>
+    #                         </div>
+    #                     """,
+    #                         unsafe_allow_html=True,
+    #                     )
+    #                 else:
+    #                     st.markdown(
+    #                         """
+    #                         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #6c757d; min-height: 200px;">
+    #                             <h5>💬 AI Assistant Response:</h5>
+    #                             <p style="color: #6c757d; font-style: italic;">
+    #                                 Click "Start Voice Assistant" to begin voice interaction with your nutrition assistant.
+    #                             </p>
+    #                         </div>
+    #                     """,
+    #                         unsafe_allow_html=True,
+    #                     )
 
-                st.markdown("---")
+    #             st.markdown("---")
 
-                # Voice response controls
-                response_col1, response_col2 = st.columns(2)
-                with response_col1:
-                    if st.button(
-                        "🔊 Test Voice", type="secondary", width='stretch'
-                    ):
-                        if st.session_state.voice_assistant:
-                            try:
-                                st.session_state.voice_assistant.tts.speak(
-                                    "Hello! I'm your nutrition assistant. Say RYAN followed by your question."
-                                )
-                                st.success("Voice test completed!")
-                            except Exception as e:
-                                st.error(f"Voice test failed: {e}")
-                        else:
-                            st.warning("Please start the voice assistant first!")
+    #             # Voice response controls
+    #             response_col1, response_col2 = st.columns(2)
+    #             with response_col1:
+    #                 if st.button(
+    #                     "🔊 Test Voice", type="secondary", width='stretch'
+    #                 ):
+    #                     if st.session_state.voice_assistant:
+    #                         try:
+    #                             st.session_state.voice_assistant.tts.speak(
+    #                                 "Hello! I'm your nutrition assistant. Say RYAN followed by your question."
+    #                             )
+    #                             st.success("Voice test completed!")
+    #                         except Exception as e:
+    #                             st.error(f"Voice test failed: {e}")
+    #                     else:
+    #                         st.warning("Please start the voice assistant first!")
 
-                with response_col2:
-                    if st.button("📋 Save Conversation", width='stretch'):
-                        st.success("Conversation saved to your chat history!")
+    #             with response_col2:
+    #                 if st.button("📋 Save Conversation", width='stretch'):
+    #                     st.success("Conversation saved to your chat history!")
 
-            st.markdown("---")
+    #         st.markdown("---")
 
-            # Instructions
-            st.subheader("📜 How to Use Voice Assistant")
-            with st.expander("🗣️ Voice Assistant Instructions", expanded=True):
-                st.markdown(
-                    """
-                **Getting Started:**
-                1. Click "Start Voice Assistant" to initialize the voice system
-                2. Wait for the confirmation message
-                3. Say "RYAN" followed by your nutrition question
-                4. The assistant will respond with voice and text
-                5. Say "stop listening" to end the session
+    #         # Instructions
+    #         st.subheader("📜 How to Use Voice Assistant")
+    #         with st.expander("🗣️ Voice Assistant Instructions", expanded=True):
+    #             st.markdown(
+    #                 """
+    #             **Getting Started:**
+    #             1. Click "Start Voice Assistant" to initialize the voice system
+    #             2. Wait for the confirmation message
+    #             3. Say "RYAN" followed by your nutrition question
+    #             4. The assistant will respond with voice and text
+    #             5. Say "stop listening" to end the session
                 
-                **Example Commands:**
-                - "RYAN, how many calories in an apple?"
-                - "RYAN, what's a good post-workout meal?"
-                - "RYAN, create a 7-day meal plan"
-                - "RYAN, how much protein do I need?"
+    #             **Example Commands:**
+    #             - "RYAN, how many calories in an apple?"
+    #             - "RYAN, what's a good post-workout meal?"
+    #             - "RYAN, create a 7-day meal plan"
+    #             - "RYAN, how much protein do I need?"
                 
-                **Troubleshooting:**
-                - Make sure your microphone is working
-                - Speak clearly and wait for the wake word "RYAN"
-                - If the assistant doesn't respond, try saying "RYAN" again
-                - Check that your AssemblyAI API key is set correctly
-                """
-                )
+    #             **Troubleshooting:**
+    #             - Make sure your microphone is working
+    #             - Speak clearly and wait for the wake word "RYAN"
+    #             - If the assistant doesn't respond, try saying "RYAN" again
+    #             - Check that your AssemblyAI API key is set correctly
+    #             """
+    #             )
 
-            # Feature information
-            st.markdown("---")
-            st.info(
-                """
-                🎙️ **Voice Assistant Features:**
+    #         # Feature information
+    #         st.markdown("---")
+    #         st.info(
+    #             """
+    #             🎙️ **Voice Assistant Features:**
                 
-                - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
-                - 🔊 **AI voice responses** - Hear personalized advice in natural speech
-                - 🧠 **Smart nutrition knowledge** - Powered by AssemblyAI and nutrition database
-                - 💾 **Voice conversation history** - All voice interactions can be saved
-                - 🎯 **Context awareness** - AI remembers your preferences and dietary needs
-                - 📱 **Hands-free operation** - Perfect for cooking or exercising
-                """
-            )
+    #             - 🎤 **Real-time voice recognition** - Speak naturally to ask nutrition questions
+    #             - 🔊 **AI voice responses** - Hear personalized advice in natural speech
+    #             - 🧠 **Smart nutrition knowledge** - Powered by AssemblyAI and nutrition database
+    #             - 💾 **Voice conversation history** - All voice interactions can be saved
+    #             - 🎯 **Context awareness** - AI remembers your preferences and dietary needs
+    #             - 📱 **Hands-free operation** - Perfect for cooking or exercising
+    #             """
+    #         )
 
-        except ImportError as e:
-            st.error(f"Voice assistant dependencies not installed: {e}")
-            st.info(
-                "Please install the required packages: pip install vosk sounddevice pyttsx3 assemblyai"
-            )
-        except Exception as e:
-            st.error(f"Voice assistant error: {e}")
-            st.info("Please check your microphone and audio settings.")
+    #     except ImportError as e:
+    #         st.error(f"Voice assistant dependencies not installed: {e}")
+    #         st.info(
+    #             "Please install the required packages: pip install vosk sounddevice pyttsx3 assemblyai"
+    #         )
+    #     except Exception as e:
+    #         st.error(f"Voice assistant error: {e}")
+    #         st.info("Please check your microphone and audio settings.")
 
     # with tab5:
     #     st.header("📝 Export Report")
