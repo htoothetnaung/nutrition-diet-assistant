@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # this reads your .env file
+load_dotenv()  
 print("Using GEMINI key:", os.getenv("GOOGLE_API_KEY"))

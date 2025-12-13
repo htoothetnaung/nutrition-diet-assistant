@@ -30,7 +30,8 @@ def ingest(config_path: str = os.path.join(os.path.dirname(__file__), "..", "con
     print(f"Loaded {len(docs)} docs -> {len(splits)} chunks")
 
     # Embeddings and vector store
-    emb = get_gemini_embeddings(model_name=cfg["gemini"]["embedding_model"], api_key=api_key)
+    from embedding_model import get_embeddings as _get_embeddings
+    emb = _get_embeddings(model_name=cfg["gemini"]["embedding_model"], api_key=api_key)
     vs_cfg = cfg["data_ingestion"]["vector_store"]
     vs = get_vector_store(
         config=vs_cfg,

@@ -1,8 +1,9 @@
 app_name: "Gemini RAG for Nutrion"
 
 gemini:
-  llm_model: "gemini-2.0-flash"
-  embedding_model: "text-embedding-004"
+  # llm_model: "meta-llama/llama-3.1-8b-instruct:free"
+  llm_model: "meta-llama/llama-3.3-70b-instruct:free"
+  embedding_model: "openai/text-embedding-3-small"
 
 data_ingestion:
   document_sources:
@@ -16,6 +17,10 @@ data_ingestion:
 
     - type: "pdf"
       path: "./data/pdfs/"
+
+    - type: "pdf"
+      path: "./data/compliance/"
+
     # - type: "markdown"
     #   path: "./data/web/"
   chunking:

@@ -4,9 +4,26 @@ from dotenv import load_dotenv
 import json
 import re
 from typing import Dict, Any, Optional, List
+from utils import calculate_bmr, calculate_tdee
+import sys
+
+# Allow importing provider-agnostic LLM getter from rag/src
+RAG_SRC = os.path.join(os.path.dirname(__file__), "rag", "src")
+if RAG_SRC not in sys.path:
+    sys.path.insert(0, RAG_SRC)
+try:
+    from llm_model import get_llm  # type: ignore
+except Exception:
+    get_llm = None  # type: ignore
 
 load_dotenv()
-client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
+# Initialize Mistral client only if a key is available; otherwise use fallback
+_MISTRAL_KEY = (
+    os.getenv("MISTRAL_API_KEY")
+    or os.getenv("MISTRALAI_API_KEY")
+    or os.getenv("MISTRAL_TOKEN")
+)
+client = Mistral(api_key=_MISTRAL_KEY) if _MISTRAL_KEY else None
 
 # SCHEMA = '{"calories": int, "protein_g": int, "carbs_g": int, "fats_g": int, "meals": {"breakfast": str, "lunch": str, "snack": str, "dinner": str}, "notes": str}'
 
@@ -109,17 +126,82 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 def get_plan_json(fields: dict, model: str = "ft:ministral-3b-latest:df8cc3b5:20250821:100048bc") -> Dict[str, Any]:
-    user_input = serialize_input(fields)
-    # Add extra constraints that the model should follow
-    constrained_instruction = INSTRUCTION + " Ensure halal compliance when requested and strictly avoid listed allergens. If fat loss is the goal, set calories below maintenance."
-    prompt = PROMPT_TMPL.format(constrained_instruction, user_input, "")
-    resp = client.chat.complete(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = resp.choices[0].message.content
-    parsed = _extract_json(content)
-    return parsed if parsed is not None else {"raw": content}
+    """Return a daily plan JSON.
+    Order of preference:
+      1) Provider-agnostic LLM (OpenRouter/Gemini) if configured or PLAN_LLM_MODEL set
+      2) Mistral SDK (if key present)
+      3) Deterministic fallback
+    """
+    # 1) Provider-agnostic LLM first when configured
+    try:
+        provider_configured = bool(os.getenv("LLM_PROVIDER") or os.getenv("PLAN_LLM_MODEL") or os.getenv("LLM_MODEL"))
+        api_available = bool(os.getenv("OPENROUTER_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        if get_llm is not None and (provider_configured or api_available):
+            user_input = serialize_input(fields)
+            constrained_instruction = INSTRUCTION + " Ensure halal compliance when requested and strictly avoid listed allergens. If fat loss is the goal, set calories below maintenance."
+            prompt = PROMPT_TMPL.format(constrained_instruction, user_input, "")
+            chosen_model = os.getenv("PLAN_LLM_MODEL") or os.getenv("LLM_MODEL") or model
+            llm = get_llm(model_name=chosen_model)
+            llm_resp = llm.invoke(prompt)
+            content = getattr(llm_resp, "content", None) or str(llm_resp)
+            parsed = _extract_json(content)
+            if parsed is not None:
+                return parsed
+            return {"raw": content}
+    except Exception:
+        pass
+
+    # 2) Mistral SDK as secondary option
+    if client is not None:
+        user_input = serialize_input(fields)
+        constrained_instruction = INSTRUCTION + " Ensure halal compliance when requested and strictly avoid listed allergens. If fat loss is the goal, set calories below maintenance."
+        prompt = PROMPT_TMPL.format(constrained_instruction, user_input, "")
+        resp = client.chat.complete(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = resp.choices[0].message.content
+        parsed = _extract_json(content)
+        return parsed if parsed is not None else {"raw": content}
+
+    # Fallback: compute macros deterministically from profile
+    f = validate_and_defaults(fields or {})
+    weight = f.get("Weight_kg") or 70
+    height = f.get("Height_cm") or 170
+    age = f.get("Age") or 25
+    gender = (f.get("Gender") or "male").lower()
+    goal = (f.get("Current_Goals") or "Maintenance").lower()
+
+    bmr = calculate_bmr(weight, height, age, gender)
+    # Map activity label loosely
+    activity = (f.get("Exercise_Frequency") or "moderately_active").replace(" ", "_").lower()
+    tdee = calculate_tdee(bmr, activity)
+    if "loss" in goal:
+        calories = int(max(1200, tdee - 400))
+    elif "gain" in goal:
+        calories = int(tdee + 250)
+    else:
+        calories = int(tdee)
+
+    # Protein 1.6 g/kg, Fat 0.8 g/kg, Carbs = remaining
+    protein_g = int(round(1.6 * weight))
+    fat_g = int(round(0.8 * weight))
+    remaining_kcal = calories - (protein_g * 4 + fat_g * 9)
+    carbs_g = int(max(0, round(remaining_kcal / 4)))
+
+    meals = {
+        "breakfast": "Oats + yogurt + fruit",
+        "lunch": "Lean protein + rice + vegetables",
+        "snack": "Nuts or yogurt",
+        "dinner": "Chicken/tofu + salad + sweet potato",
+    }
+    return {
+        "calories": calories,
+        "protein_g": protein_g,
+        "carbs_g": carbs_g,
+        "fats_g": fat_g,
+        "meals": meals,
+    }
 
 def batch_score_csv(input_csv: str, output_csv: str, model: str = "ft:ministral-3b-latest:df8cc3b5:20250821:100048bc") -> None:
     """Read user rows from CSV and write a CSV with a plan_json column for QA."""

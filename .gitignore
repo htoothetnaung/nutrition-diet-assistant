@@ -68,7 +68,8 @@ agent-base/
 
 api_test.py
 # test.py
-
 data
 
 secrets.toml
+
+kaggle-5days-ai

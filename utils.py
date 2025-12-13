@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 import random
 import os
 import json
+import re
 from typing import List, Dict, Any, Optional
+import sys
 
 import httpx
 from dotenv import load_dotenv
@@ -24,6 +26,15 @@ except Exception:  # pragma: no cover
     LegacyMistralClient = None
 
 load_dotenv()
+
+# Allow importing provider-agnostic LLM getter from rag/src
+RAG_SRC = os.path.join(os.path.dirname(__file__), "rag", "src")
+if RAG_SRC not in sys.path:
+    sys.path.insert(0, RAG_SRC)
+try:
+    from llm_model import get_llm  # type: ignore
+except Exception:  # pragma: no cover
+    get_llm = None  # type: ignore
 
 def generate_mock_nutrition_data():
     """Generate mock nutrition data for dashboard visualization"""
@@ -322,89 +333,163 @@ def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
     if not text:
         return {"items": [], "notes": ""}
 
-    api_key = os.getenv("MISTRAL_API_KEY") or os.getenv("MISTRALAI_API_KEY") or os.getenv("MISTRAL_TOKEN")
-    model_name = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
-    if (MistralClient or LegacyMistralClient) and api_key:
+    # Provider-agnostic LLM path (OpenRouter/Gemini) when configured
+    if get_llm is not None and (os.getenv("LLM_PROVIDER") or os.getenv("OPENROUTER_API_KEY") or os.getenv("GOOGLE_API_KEY")):
         try:
-            raw = "{}"
-            if MistralClient is not None:
-                client = MistralClient(api_key=api_key)
-                schema_hint = (
-                    "Return ONLY JSON with this exact shape: "
-                    "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
-                    "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
-                    "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
-                    "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
-                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
-                    "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
-                    "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
-                    "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
-                )
-                prompt = (
-                    "You are a nutrition extraction assistant. "
-                    "Extract foods with quantities/units from the text below.\n\n"
-                    f"TEXT:\n{text}\n\n"
-                    f"{schema_hint}"
-                )
-                resp = client.chat(
-                    model=model_name,
-                    messages=[
-                        ChatMessage(role="system", content="You are a nutrition extraction assistant."),
-                        ChatMessage(role="user", content=prompt),
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.2,
-                )
-                raw = resp.choices[0].message.content if getattr(resp, "choices", None) else "{}"
-            elif LegacyMistralClient is not None:
-                client = LegacyMistralClient(api_key=api_key)
-                schema_hint = (
-                    "Return ONLY JSON with this exact shape: "
-                    "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
-                    "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
-                    "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
-                    "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
-                    "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
-                    "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
-                    "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
-                    "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
-                )
-                prompt = (
-                    "You are a nutrition extraction assistant. "
-                    "Extract foods with quantities/units from the text below.\n\n"
-                    f"TEXT:\n{text}\n\n"
-                    f"{schema_hint}"
-                )
-                # Legacy client exposes .chat.complete
-                resp = client.chat.complete(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": "You are a nutrition extraction assistant."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.2,
-                )
-                raw = resp.choices[0].message.content if getattr(resp, "choices", None) else "{}"
-            data = json.loads(raw)
+            schema_hint = (
+                "Return ONLY JSON with this exact shape: "
+                '{"items":[{"name":string,"quantity":number,"unit":string}],"notes":string}. '
+                "items should include ALL edible foods mentioned, including multi-word dishes. "
+                "Support units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
+                "Infer a reasonable quantity when not specified (default 1 serving). "
+                'If nothing edible is found, return {"items":[],"notes":"no_food_found"}.'
+            )
+            prompt = (
+                "You are a nutrition extraction assistant. "
+                "Extract foods with quantities/units from the text below.\n\n"
+                f"TEXT:\n{text}\n\n"
+                f"{schema_hint}"
+            )
+            model_name = os.getenv("EXTRACT_LLM_MODEL") or os.getenv("LLM_MODEL") or "meta-llama/llama-3.3-70b-instruct:free"
+            llm = get_llm(model_name=model_name)
+            llm_resp = llm.invoke(prompt)
+            content = getattr(llm_resp, "content", None) or str(llm_resp)
+            try:
+                data = json.loads(content)
+            except Exception:
+                # try to find a JSON block
+                m = re.search(r"\{[\s\S]*\}", content)
+                data = json.loads(m.group(0)) if m else {}
             items = data.get("items", []) if isinstance(data, dict) else []
-            # sanitize
-            cleaned = []
+            cleaned: List[Dict[str, Any]] = []
             for it in items:
-                name = str(it.get("name", "")).strip()
+                name = str((it or {}).get("name", "")).strip()
                 try:
-                    qty = float(it.get("quantity", 0))
+                    qty = float((it or {}).get("quantity", 0))
                 except Exception:
                     qty = 0.0
-                unit = str(it.get("unit", "g")).strip() or "g"
+                unit = str((it or {}).get("unit", "g")).strip() or "g"
                 if name and qty > 0:
                     cleaned.append({"name": name, "quantity": qty, "unit": unit})
-            return {"items": cleaned, "notes": data.get("notes", "")}
+            return {"items": cleaned, "notes": (data.get("notes", "") if isinstance(data, dict) else "")}
         except Exception:
-            return {"items": [], "notes": "llm_error"}
+            # fall back to deterministic below
+            pass
 
-    # No Mistral available
-    return {"items": [], "notes": "llm_unavailable"}
+    # api_key = os.getenv("MISTRAL_API_KEY") or os.getenv("MISTRALAI_API_KEY") or os.getenv("MISTRAL_TOKEN")
+    # model_name = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
+    # if (MistralClient or LegacyMistralClient) and api_key:
+    #     try:
+    #         raw = "{}"
+    #         if MistralClient is not None:
+    #             client = MistralClient(api_key=api_key)
+    #             schema_hint = (
+    #                 "Return ONLY JSON with this exact shape: "
+    #                 "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
+    #                 "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
+    #                 "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
+    #                 "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
+    #                 "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
+    #                 "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
+    #                 "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
+    #                 "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
+    #             )
+    #             prompt = (
+    #                 "You are a nutrition extraction assistant. "
+    #                 "Extract foods with quantities/units from the text below.\n\n"
+    #                 f"TEXT:\n{text}\n\n"
+    #                 f"{schema_hint}"
+    #             )
+    #             resp = client.chat(
+    #                 model=model_name,
+    #                 messages=[
+    #                     ChatMessage(role="system", content="You are a nutrition extraction assistant."),
+    #                     ChatMessage(role="user", content=prompt),
+    #                 ],
+    #                 response_format={"type": "json_object"},
+    #                 temperature=0.2,
+    #             )
+    #             raw = resp.choices[0].message.content if getattr(resp, "choices", None) else "{}"
+    #         elif LegacyMistralClient is not None:
+    #             client = LegacyMistralClient(api_key=api_key)
+    #             schema_hint = (
+    #                 "Return ONLY JSON with this exact shape: "
+    #                 "{\"items\":[{\"name\":string,\"quantity\":number,\"unit\":string}],\"notes\":string}. "
+    #                 "items should include ALL edible foods mentioned, including common fast foods and restaurant meals. "
+    #                 "IMPORTANT: For dishes like 'cheeseburger with fries' or 'fried chicken with mashed potatoes', "
+    #                 "extract EACH component as a separate item (e.g., 'cheeseburger' and 'fries' as two items). "
+    #                 "Support multi-word dishes, and common units: g, kg, ml, l, cup, bowl, tbsp, tsp, piece, slice, serving. "
+    #                 "If the unit is a volume/portion (cup/bowl/piece/slice/serving) keep it as provided; do NOT convert to grams. "
+    #                 "Infer a reasonable quantity when not specified (e.g., 'cheeseburger' => quantity=1, unit='serving'). "
+    #                 "If nothing edible is found, return {\"items\":[],\"notes\":\"no_food_found\"}."
+    #             )
+    #             prompt = (
+    #                 "You are a nutrition extraction assistant. "
+    #                 "Extract foods with quantities/units from the text below.\n\n"
+    #                 f"TEXT:\n{text}\n\n"
+    #                 f"{schema_hint}"
+    #             )
+    #             # Legacy client exposes .chat.complete
+    #             resp = client.chat.complete(
+    #                 model=model_name,
+    #                 messages=[
+    #                     {"role": "system", "content": "You are a nutrition extraction assistant."},
+    #                     {"role": "user", "content": prompt},
+    #                 ],
+    #                 response_format={"type": "json_object"},
+    #                 temperature=0.2,
+    #             )
+    #             raw = resp.choices[0].message.content if getattr(resp, "choices", None) else "{}"
+    #         data = json.loads(raw)
+    #         items = data.get("items", []) if isinstance(data, dict) else []
+    #         # sanitize
+    #         cleaned = []
+    #         for it in items:
+    #             name = str(it.get("name", "")).strip()
+    #             try:
+    #                 qty = float(it.get("quantity", 0))
+    #             except Exception:
+    #                 qty = 0.0
+    #             unit = str(it.get("unit", "g")).strip() or "g"
+    #             if name and qty > 0:
+    #                 cleaned.append({"name": name, "quantity": qty, "unit": unit})
+    #         return {"items": cleaned, "notes": data.get("notes", "")}
+    #     except Exception:
+    #         return {"items": [], "notes": "llm_error"}
+
+    # # No Mistral available
+    # return {"items": [], "notes": "llm_unavailable"}
+
+    # Deterministic parser (Tier 1): no external API
+    def _split_items(s: str) -> List[str]:
+        parts = re.split(r",|;|\band\b", s, flags=re.IGNORECASE)
+        return [p.strip() for p in parts if p and p.strip()]
+
+    def _parse_one(s: str) -> Optional[Dict[str, Any]]:
+        # Quantity + unit + name
+        m = re.match(
+            r"\s*(?P<q>\d+(?:\.\d+)?)\s*(?P<u>g|kg|ml|l|cup|cups|bowl|bowls|tbsp|tablespoon|tsp|teaspoon|piece|pieces|slice|serving|servings)?\s*(?P<name>[A-Za-z][\w\s\-]+)\s*",
+            s,
+            flags=re.IGNORECASE,
+        )
+        if m:
+            q = float(m.group("q"))
+            u = (m.group("u") or "g").lower()
+            name = m.group("name").strip()
+            return {"name": name, "quantity": q, "unit": u}
+        # Name only -> infer 1 serving
+        name_only = re.match(r"\s*([A-Za-z][\w\s\-]+)\s*", s)
+        if name_only:
+            name = name_only.group(1).strip()
+            return {"name": name, "quantity": 1.0, "unit": "serving"}
+        return None
+
+    items: List[Dict[str, Any]] = []
+    for chunk in _split_items(text):
+        it = _parse_one(chunk)
+        if it and it.get("name"):
+            items.append(it)
+    return {"items": items, "notes": "rules"}
 
 def _fdc_search(name: str) -> Dict[str, Any]:
     if not FDC_API_KEY:
