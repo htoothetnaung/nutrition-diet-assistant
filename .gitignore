@@ -68,8 +68,16 @@ agent-base/
 
 api_test.py
 # test.py
+
+
+# Folders to ignore 
 data
+scripts
+tools
+local_checkpoints
+checkpoints
+notebooks_sample_old
+notebooks
+output_evaluation
 
 secrets.toml
-
-kaggle-5days-ai
