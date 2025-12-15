@@ -12,18 +12,18 @@ import sys
 import httpx
 from dotenv import load_dotenv
 
-# Optional: LLM for ingredient extraction (Mistral)
-try:
-    from mistralai.client import MistralClient
-    from mistralai.models.chat_completion import ChatMessage
-except Exception:  # pragma: no cover
-    MistralClient = None
-    ChatMessage = None
-try:
-    # Older SDK alias
-    from mistralai import Mistral as LegacyMistralClient
-except Exception:  # pragma: no cover
-    LegacyMistralClient = None
+# # Optional: LLM for ingredient extraction (Mistral)
+# try:
+#     from mistralai.client import MistralClient
+#     from mistralai.models.chat_completion import ChatMessage
+# except Exception:  # pragma: no cover
+#     MistralClient = None
+#     ChatMessage = None
+# try:
+#     # Older SDK alias
+#     from mistralai import Mistral as LegacyMistralClient
+# except Exception:  # pragma: no cover
+#     LegacyMistralClient = None
 
 load_dotenv()
 
@@ -59,18 +59,18 @@ def create_nutrition_charts(nutrition_df):
     """Create various nutrition charts for the dashboard"""
     charts = {}
 
-# Minimal known food vocabulary to validate free-text inputs
-KNOWN_FOODS = {
-    # staples
-    "rice","chicken","egg","tofu","potato","pork","salad","bread","noodle","noodles","pasta",
-    "beef","fish","shrimp","prawn","milk","yogurt","banana","apple","avocado","oil","butter","cheese",
-    # vegetables
-    "spinach","broccoli","cabbage","tomato","onion","garlic","okra","carrot","pepper",
-    # SEA/Chinese dishes
-    "mala xiang guo","hot pot","noodle soup","fried rice","fried noodles","laksa","pho","ramen",
-    # Myanmar/local
-    "mohinga","laphet","shan noodles",
-}
+# # Minimal known food vocabulary to validate free-text inputs
+# KNOWN_FOODS = {
+#     # staples
+#     "rice","chicken","egg","tofu","potato","pork","salad","bread","noodle","noodles","pasta",
+#     "beef","fish","shrimp","prawn","milk","yogurt","banana","apple","avocado","oil","butter","cheese",
+#     # vegetables
+#     "spinach","broccoli","cabbage","tomato","onion","garlic","okra","carrot","pepper",
+#     # SEA/Chinese dishes
+#     "mala xiang guo","hot pot","noodle soup","fried rice","fried noodles","laksa","pho","ramen",
+#     # Myanmar/local
+#     "mohinga","laphet","shan noodles",
+# }
 
 def looks_like_meal_text(text: str) -> bool:
     """Heuristic: require a digit or a known food keyword to proceed."""
@@ -180,20 +180,20 @@ def format_nutrition_display(calories, protein, carbs, fat, fiber=None, sugar=No
     
     return nutrition_info
 
-def get_meal_timing_advice(meal_time):
-    """Provide meal timing advice based on time of day"""
-    hour = meal_time.hour
+# def get_meal_timing_advice(meal_time):
+#     """Provide meal timing advice based on time of day"""
+#     hour = meal_time.hour
     
-    if 5 <= hour < 10:
-        return "🌅 Great timing for breakfast! This will kickstart your metabolism for the day."
-    elif 10 <= hour < 14:
-        return "☀️ Perfect lunch timing! This should keep you energized for the afternoon."
-    elif 14 <= hour < 18:
-        return "🌤️ Good afternoon snack time! Keep it light and nutritious."
-    elif 18 <= hour < 22:
-        return "🌆 Dinner time! Try to finish eating 2-3 hours before bedtime."
-    else:
-        return "🌙 Late night eating! Consider lighter options to support better sleep."
+#     if 5 <= hour < 10:
+#         return "🌅 Great timing for breakfast! This will kickstart your metabolism for the day."
+#     elif 10 <= hour < 14:
+#         return "☀️ Perfect lunch timing! This should keep you energized for the afternoon."
+#     elif 14 <= hour < 18:
+#         return "🌤️ Good afternoon snack time! Keep it light and nutritious."
+#     elif 18 <= hour < 22:
+#         return "🌆 Dinner time! Try to finish eating 2-3 hours before bedtime."
+#     else:
+#         return "🌙 Late night eating! Consider lighter options to support better sleep."
 
 def validate_nutrition_input(calories, protein, carbs, fat):
     """Validate nutrition input values"""
@@ -273,8 +273,6 @@ def generate_meal_suggestions(dietary_restrictions, health_goals, cuisine_prefer
 # -----------------------------
 # Meal Analyzer helpers (LLM+USDA)
 # -----------------------------
-# Meal Analyzer helpers (LLM+USDA)
-# -----------------------------
 
 FDC_API_KEY = os.getenv("FDC_API_KEY", "")
 
@@ -321,17 +319,28 @@ def convert_to_grams(quantity: float, unit: str, food_name: str) -> float:
     if unit in ["slice", "slices"]:
         base = _BASIC_GRAM_MAP.get((name, "slice"), 30.0)
         return float(quantity) * base
+    if unit in ["serving", "servings"]:
+        # use food-specific serving mapping when available; default 150g per serving
+        base = _BASIC_GRAM_MAP.get((name, "serving"), 150.0)
+        return float(quantity) * base
     # default: assume grams
     return float(quantity)
 
 
 def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
-    """Extract structured ingredients from free text using Mistral.
+    """Extract structured ingredients from free text.
     Returns dict: {"items": [{"name","quantity","unit"}], "notes": str}
     """
     text = (text or "").strip()
     if not text:
         return {"items": [], "notes": ""}
+
+    # Helper: detect Burmese characters
+    def _contains_burmese(s: str) -> bool:
+        try:
+            return any(0x1000 <= ord(ch) <= 0x109F for ch in s)
+        except Exception:
+            return False
 
     # Provider-agnostic LLM path (OpenRouter/Gemini) when configured
     if get_llm is not None and (os.getenv("LLM_PROVIDER") or os.getenv("OPENROUTER_API_KEY") or os.getenv("GOOGLE_API_KEY")):
@@ -344,13 +353,20 @@ def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
                 "Infer a reasonable quantity when not specified (default 1 serving). "
                 'If nothing edible is found, return {"items":[],"notes":"no_food_found"}.'
             )
+            preface = (
+                "If the input is Burmese (Myanmar) language, first translate it to natural English dish names and units, "
+                "then perform extraction. Always output the JSON in English (names/units in English). "
+            ) if _contains_burmese(text) else ""
             prompt = (
                 "You are a nutrition extraction assistant. "
+                + preface +
                 "Extract foods with quantities/units from the text below.\n\n"
                 f"TEXT:\n{text}\n\n"
                 f"{schema_hint}"
             )
-            model_name = os.getenv("EXTRACT_LLM_MODEL") or os.getenv("LLM_MODEL") or "meta-llama/llama-3.3-70b-instruct:free"
+            # model_name = os.getenv("EXTRACT_LLM_MODEL") or os.getenv("LLM_MODEL") or "meta-llama/llama-3.3-70b-instruct:free"
+
+            model_name = os.getenv("EXTRACT_LLM_MODEL")
             llm = get_llm(model_name=model_name)
             llm_resp = llm.invoke(prompt)
             content = getattr(llm_resp, "content", None) or str(llm_resp)
@@ -460,36 +476,40 @@ def extract_ingredients_free_text(text: str) -> Dict[str, Any]:
     # # No Mistral available
     # return {"items": [], "notes": "llm_unavailable"}
 
-    # Deterministic parser (Tier 1): no external API
-    def _split_items(s: str) -> List[str]:
-        parts = re.split(r",|;|\band\b", s, flags=re.IGNORECASE)
-        return [p.strip() for p in parts if p and p.strip()]
+    
+    # # Deterministic parser (Tier 1): no external API
+    # def _split_items(s: str) -> List[str]:
+    #     parts = re.split(r",|;|\band\b", s, flags=re.IGNORECASE)
+    #     return [p.strip() for p in parts if p and p.strip()]
 
-    def _parse_one(s: str) -> Optional[Dict[str, Any]]:
-        # Quantity + unit + name
-        m = re.match(
-            r"\s*(?P<q>\d+(?:\.\d+)?)\s*(?P<u>g|kg|ml|l|cup|cups|bowl|bowls|tbsp|tablespoon|tsp|teaspoon|piece|pieces|slice|serving|servings)?\s*(?P<name>[A-Za-z][\w\s\-]+)\s*",
-            s,
-            flags=re.IGNORECASE,
-        )
-        if m:
-            q = float(m.group("q"))
-            u = (m.group("u") or "g").lower()
-            name = m.group("name").strip()
-            return {"name": name, "quantity": q, "unit": u}
-        # Name only -> infer 1 serving
-        name_only = re.match(r"\s*([A-Za-z][\w\s\-]+)\s*", s)
-        if name_only:
-            name = name_only.group(1).strip()
-            return {"name": name, "quantity": 1.0, "unit": "serving"}
-        return None
+    # def _parse_one(s: str) -> Optional[Dict[str, Any]]:
+    #     # Quantity + unit + name
+    #     m = re.match(
+    #         r"\s*(?P<q>\d+(?:\.\d+)?)\s*(?P<u>g|kg|ml|l|cup|cups|bowl|bowls|tbsp|tablespoon|tsp|teaspoon|piece|pieces|slice|serving|servings)?\s*(?P<name>[A-Za-z][\w\s\-]+)\s*",
+    #         s,
+    #         flags=re.IGNORECASE,
+    #     )
+    #     if m:
+    #         q = float(m.group("q"))
+    #         u = (m.group("u") or "g").lower()
+    #         name = m.group("name").strip()
+    #         return {"name": name, "quantity": q, "unit": u}
+    #     # Name only -> infer 1 serving
+    #     name_only = re.match(r"\s*([A-Za-z][\w\s\-]+)\s*", s)
+    #     if name_only:
+    #         name = name_only.group(1).strip()
+    #         return {"name": name, "quantity": 1.0, "unit": "serving"}
+    #     return None
 
-    items: List[Dict[str, Any]] = []
-    for chunk in _split_items(text):
-        it = _parse_one(chunk)
-        if it and it.get("name"):
-            items.append(it)
-    return {"items": items, "notes": "rules"}
+    # items: List[Dict[str, Any]] = []
+    # for chunk in _split_items(text):
+    #     it = _parse_one(chunk)
+    #     if it and it.get("name"):
+    #         items.append(it)
+    # return {"items": items, "notes": "rules"}
+
+    # Deterministic parser temporarily disabled (LLM-only mode)
+    return {"items": [], "notes": "llm_unavailable"}
 
 def _fdc_search(name: str) -> Dict[str, Any]:
     if not FDC_API_KEY:
@@ -565,33 +585,33 @@ def _extract_per100g(food: Dict[str, Any]) -> Dict[str, float]:
     return nutrients
 
 
-def _rough_local_lookup(item: Dict[str, Any]) -> Optional[Dict[str, float]]:
-    # very rough fallback table per 100g
-    name = (item.get("name") or "").lower()
-    table = {
-        "rice": {"calories": 130, "protein_g": 2.7, "carbs_g": 28, "fat_g": 0.3, "fiber_g": 0.4, "sugar_g": 0},
-        "chicken": {"calories": 165, "protein_g": 31, "carbs_g": 0, "fat_g": 3.6, "fiber_g": 0, "sugar_g": 0},
-        "egg": {"calories": 143, "protein_g": 13, "carbs_g": 1.1, "fat_g": 9.5, "fiber_g": 0, "sugar_g": 1.1},
-        "tofu": {"calories": 76, "protein_g": 8, "carbs_g": 1.9, "fat_g": 4.8, "fiber_g": 0.3, "sugar_g": 0.6},
-        "potato": {"calories": 77, "protein_g": 2, "carbs_g": 17, "fat_g": 0.1, "fiber_g": 2.2, "sugar_g": 0.8},
-        "pork": {"calories": 242, "protein_g": 27, "carbs_g": 0, "fat_g": 14, "fiber_g": 0, "sugar_g": 0},
-        "salad": {"calories": 20, "protein_g": 1.5, "carbs_g": 3.5, "fat_g": 0.2, "fiber_g": 1.8, "sugar_g": 1.5},
-        "noodles": {"calories": 138, "protein_g": 5.0, "carbs_g": 25.0, "fat_g": 2.5, "fiber_g": 1.2, "sugar_g": 0.8},
-        "mala xiang guo": {"calories": 200, "protein_g": 8.0, "carbs_g": 8.0, "fat_g": 14.0, "fiber_g": 1.5, "sugar_g": 2.0},
-    }
-    base = table.get(name)
-    if not base:
-        # try startswith match
-        for k, v in table.items():
-            if name.startswith(k):
-                base = v
-                break
-    if not base:
-        # Unknown in our small table
-        return None
-    grams = convert_to_grams(item.get("quantity", 100), item.get("unit", "g"), item.get("name", ""))
-    factor = grams / 100.0
-    return {k: round(v * factor, 2) for k, v in base.items()} | {"sodium_mg": 0.0}
+# def _rough_local_lookup(item: Dict[str, Any]) -> Optional[Dict[str, float]]:
+#     # very rough fallback table per 100g
+#     name = (item.get("name") or "").lower()
+#     table = {
+#         "rice": {"calories": 130, "protein_g": 2.7, "carbs_g": 28, "fat_g": 0.3, "fiber_g": 0.4, "sugar_g": 0},
+#         "chicken": {"calories": 165, "protein_g": 31, "carbs_g": 0, "fat_g": 3.6, "fiber_g": 0, "sugar_g": 0},
+#         "egg": {"calories": 143, "protein_g": 13, "carbs_g": 1.1, "fat_g": 9.5, "fiber_g": 0, "sugar_g": 1.1},
+#         "tofu": {"calories": 76, "protein_g": 8, "carbs_g": 1.9, "fat_g": 4.8, "fiber_g": 0.3, "sugar_g": 0.6},
+#         "potato": {"calories": 77, "protein_g": 2, "carbs_g": 17, "fat_g": 0.1, "fiber_g": 2.2, "sugar_g": 0.8},
+#         "pork": {"calories": 242, "protein_g": 27, "carbs_g": 0, "fat_g": 14, "fiber_g": 0, "sugar_g": 0},
+#         "salad": {"calories": 20, "protein_g": 1.5, "carbs_g": 3.5, "fat_g": 0.2, "fiber_g": 1.8, "sugar_g": 1.5},
+#         "noodles": {"calories": 138, "protein_g": 5.0, "carbs_g": 25.0, "fat_g": 2.5, "fiber_g": 1.2, "sugar_g": 0.8},
+#         "mala xiang guo": {"calories": 200, "protein_g": 8.0, "carbs_g": 8.0, "fat_g": 14.0, "fiber_g": 1.5, "sugar_g": 2.0},
+#     }
+#     base = table.get(name)
+#     if not base:
+#         # try startswith match
+#         for k, v in table.items():
+#             if name.startswith(k):
+#                 base = v
+#                 break
+#     if not base:
+#         # Unknown in our small table
+#         return None
+#     grams = convert_to_grams(item.get("quantity", 100), item.get("unit", "g"), item.get("name", ""))
+#     factor = grams / 100.0
+#     return {k: round(v * factor, 2) for k, v in base.items()} | {"sodium_mg": 0.0}
 
 
 def compute_nutrition(items: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -612,12 +632,12 @@ def compute_nutrition(items: List[Dict[str, Any]]) -> Dict[str, Any]:
                 nutrients = {k: round(v * factor, 2) for k, v in per100.items()}
                 fdc_id = food.get("fdcId")
         
-        # If USDA lookup failed, try local lookup
-        if not nutrients:
-            local_nutrients = _rough_local_lookup(it)
-            if local_nutrients:
-                nutrients = local_nutrients
-                fdc_id = "local"
+        # # If USDA lookup failed, try local lookup
+        # if not nutrients:
+        #     local_nutrients = _rough_local_lookup(it)
+        #     if local_nutrients:
+        #         nutrients = local_nutrients
+        #         fdc_id = "local"
         
         # If we have nutrients, add to totals
         if nutrients:

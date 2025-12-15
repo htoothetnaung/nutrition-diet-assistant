@@ -47,7 +47,7 @@ def render_analyzer_page(db_manager: Any):
                 note = extraction.get("notes", "")
                 if note in ("llm_unavailable", "llm_error"):
                     st.error(
-                        "Text parsing requires Mistral. Please set MISTRAL_API_KEY and try again."
+                        "Text parsing requires LLM. Please set LLM_API_KEY and try again."
                     )
                     st.stop()
             items = (
