@@ -5,6 +5,8 @@ import json
 import streamlit as st
 
 from services.rag_service import init_rag
+from services.agent_service import build_agent
+from components.agent_trace import render_agent_trace
  
 # For building an Agent-specific chain with a different LLM
 RAG_SRC = os.path.join(os.path.dirname(__file__), "..", "rag", "src")
@@ -37,7 +39,7 @@ def render_chat_page(db_manager: Any, chat_manager: Any):
             key="chat_mode",
         )
 
-        if st.button("+ New Chat", type="primary", width='stretch'):
+        if st.button("+ New Chat", type="primary", use_container_width=True):
             if st.session_state.user_data:
                 new_session_id = chat_manager.create_new_chat_session(
                     st.session_state.user_data["id"],
@@ -85,7 +87,7 @@ def render_chat_page(db_manager: Any, chat_manager: Any):
                     label + badge,
                     key=f"session_{session_id}",
                     type=button_type,
-                    width='stretch',
+                    use_container_width=True,
                 ):
                     st.session_state.current_session_id = session_id
                     st.rerun()

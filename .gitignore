@@ -79,5 +79,6 @@ checkpoints
 notebooks_sample_old
 notebooks
 output_evaluation
+models
 
 secrets.toml

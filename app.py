@@ -140,6 +140,18 @@ if "rag_error" not in st.session_state:
 if "llm" not in st.session_state:
     st.session_state.llm = None
 
+# VLM (Qwen3-VL) Model State - kept loaded for session
+if "vlm_model_loaded" not in st.session_state:
+    st.session_state.vlm_model_loaded = False
+if "vlm_model" not in st.session_state:
+    st.session_state.vlm_model = None
+if "vlm_processor" not in st.session_state:
+    st.session_state.vlm_processor = None
+if "vlm_device" not in st.session_state:
+    st.session_state.vlm_device = None
+if "vlm_history" not in st.session_state:
+    st.session_state.vlm_history = []
+
 if st.session_state.authenticated and st.session_state.login_time:
     if datetime.now() - st.session_state.login_time > timedelta(minutes=30):
         st.session_state.authenticated = False
@@ -163,7 +175,7 @@ with st.sidebar:
                     "Password", type="password", key="login_password"
                 )
                 login_submitted = st.form_submit_button(
-                    "Login", width='stretch'
+                    "Login", use_container_width=True
                 )
             if login_submitted:
                 if login_email and login_password:
@@ -201,7 +213,7 @@ with st.sidebar:
                     "Full Name", key="signup_name", placeholder="Your Full Name"
                 )
                 signup_submitted = st.form_submit_button(
-                    "Sign Up", width='stretch'
+                    "Sign Up", use_container_width=True
                 )
             if signup_submitted:
                 if signup_email and signup_password and full_name:
@@ -435,7 +447,7 @@ else:
     #                 if st.button(
     #                     "🎤 Start Voice Assistant",
     #                     type="primary",
-    #                     width='stretch',
+    #                     use_container_width=True,
     #                 ):
     #                     if not st.session_state.voice_running:
     #                         try:
@@ -495,7 +507,7 @@ else:
     #                     else:
     #                         st.info("Voice assistant is already running!")
 
-    #                 if st.button("⏹️ Stop Voice Assistant", width='stretch'):
+    #                 if st.button("⏹️ Stop Voice Assistant", use_container_width=True):
     #                     if st.session_state.voice_running:
     #                         st.session_state.voice_running = False
     #                         if st.session_state.voice_assistant:
@@ -611,7 +623,7 @@ else:
     #             response_col1, response_col2 = st.columns(2)
     #             with response_col1:
     #                 if st.button(
-    #                     "🔊 Test Voice", type="secondary", width='stretch'
+    #                     "🔊 Test Voice", type="secondary", use_container_width=True
     #                 ):
     #                     if st.session_state.voice_assistant:
     #                         try:
@@ -625,7 +637,7 @@ else:
     #                         st.warning("Please start the voice assistant first!")
 
     #             with response_col2:
-    #                 if st.button("📋 Save Conversation", width='stretch'):
+    #                 if st.button("📋 Save Conversation", use_container_width=True):
     #                     st.success("Conversation saved to your chat history!")
 
     #         st.markdown("---")

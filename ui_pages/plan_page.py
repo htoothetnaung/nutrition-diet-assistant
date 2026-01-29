@@ -108,7 +108,7 @@ def render_plan_page(db_manager):
 
     save_col1, save_col2 = st.columns([1, 3])
     with save_col1:
-        save_prefs = st.button("💾 Save Data", width='stretch')
+        save_prefs = st.button("💾 Save Data", use_container_width=True)
     if save_prefs:
         if not st.session_state.user_data:
             st.error("Please log in to save preferences.")
